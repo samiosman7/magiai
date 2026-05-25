@@ -100,7 +100,7 @@ async function google(call: ModelCall): Promise<ModelResult> {
     }
   }
 
-  throw lastError ?? new Error("google call failed for all configured keys");
+  return fallbackGenerate(call, lastError ?? new Error("google call failed for all configured keys"));
 }
 
 async function googleWithKey(call: ModelCall, apiKey: string): Promise<ModelResult> {
@@ -133,9 +133,18 @@ async function googleWithKey(call: ModelCall, apiKey: string): Promise<ModelResu
   }
 
   const data = (await response.json()) as {
-    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+    candidates?: Array<{
+      content?: { parts?: Array<{ text?: string }> };
+      finishReason?: string;
+    }>;
+    promptFeedback?: unknown;
   };
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+  if (!text) {
+    throw new Error(
+      `google returned no text${data.candidates?.[0]?.finishReason ? ` (${data.candidates[0].finishReason})` : ""}`
+    );
+  }
 
   return { text, provider: call.provider, model: call.model, isMock: false };
 }
@@ -161,13 +170,67 @@ function mockGenerate(call: ModelCall): ModelResult {
       rationale: "No blocking correctness problem was found in mock mode.",
     });
   } else {
-    text = `Mock ${label}: ${call.prompt}`;
+    text =
+      "This is a mock MAGI response. Add provider keys and set MAGI_MOCK_MODE=false to generate live model output.";
   }
 
   return {
     text,
     provider: "mock",
     model: "magi-mock",
+    isMock: true,
+  };
+}
+
+function fallbackGenerate(call: ModelCall, error: Error): ModelResult {
+  const prompt = call.prompt.trim();
+  let text =
+    "MAGI could not reach the configured live provider, so this response is a local fallback. Check deployment environment variables and provider network access.";
+
+  if (call.system.includes("MAGI direct route")) {
+    text = [
+      "I could not reach the live model provider, but here is a useful direct response path:",
+      "",
+      "- Restate the concrete objective in one sentence.",
+      "- Break the work into the smallest launchable step.",
+      "- Verify the result with a real user-facing test before adding more complexity.",
+      "",
+      `Original request: ${prompt}`,
+    ].join("\n");
+  }
+
+  if (call.system.includes("correction and gap-filling")) {
+    text = [
+      "Fallback repaired draft:",
+      "Clarify the user's desired outcome, identify missing setup or constraints, then produce a direct answer with concrete steps and a verification plan.",
+      `Provider issue: ${error.message}`,
+    ].join(" ");
+  }
+
+  if (call.system.includes("builder and hardener")) {
+    text = [
+      "Fallback final answer:",
+      "1. Define the exact user-facing outcome.",
+      "2. Implement the smallest backend path that produces that outcome.",
+      "3. Test it with one realistic prompt and fix any missing provider/configuration issues.",
+      "4. Only then add billing, storage, and analytics around the working path.",
+      "",
+      `Provider issue: ${error.message}`,
+    ].join("\n");
+  }
+
+  if (call.system.includes("intent-preservation") || call.system.includes("fresh, independent correctness judge")) {
+    text = JSON.stringify({
+      passed: false,
+      issue: "live provider unavailable",
+      rationale: `The provider call failed before this node could independently verify the answer: ${error.message}`,
+    });
+  }
+
+  return {
+    text,
+    provider: "mock",
+    model: "provider-fallback",
     isMock: true,
   };
 }

@@ -1,25 +1,28 @@
 import type { MagiMode, ModelCall, ProviderName } from "./types";
 import { hasProviderKeys } from "./provider-keys";
 
-type NodeName = "melchior" | "balthasar" | "casper" | "judge";
+type NodeName = "direct" | "melchior" | "balthasar" | "casper" | "judge";
 
 const plans: Record<MagiMode, Record<NodeName, Pick<ModelCall, "provider" | "model">>> = {
   economy: {
+    direct: { provider: "google", model: "gemini-2.5-flash" },
     melchior: { provider: "deepseek", model: "deepseek-chat" },
     balthasar: { provider: "qwen", model: "qwen-plus" },
-    casper: { provider: "google", model: "gemini-1.5-flash" },
+    casper: { provider: "google", model: "gemini-2.5-flash" },
     judge: { provider: "deepseek", model: "deepseek-chat" },
   },
   standard: {
-    melchior: { provider: "google", model: "gemini-1.5-flash" },
+    direct: { provider: "google", model: "gemini-2.5-flash" },
+    melchior: { provider: "google", model: "gemini-2.5-flash" },
     balthasar: { provider: "openai", model: "gpt-4o-mini" },
     casper: { provider: "anthropic", model: "claude-3-5-haiku-latest" },
-    judge: { provider: "google", model: "gemini-1.5-flash" },
+    judge: { provider: "google", model: "gemini-2.5-flash" },
   },
   premium: {
+    direct: { provider: "google", model: "gemini-2.5-flash" },
     melchior: { provider: "anthropic", model: "claude-3-5-sonnet-latest" },
     balthasar: { provider: "openai", model: "gpt-4o" },
-    casper: { provider: "google", model: "gemini-1.5-pro" },
+    casper: { provider: "google", model: "gemini-2.5-pro" },
     judge: { provider: "anthropic", model: "claude-3-5-sonnet-latest" },
   },
 };
@@ -33,7 +36,7 @@ export function getModelPlan(mode: MagiMode, node: NodeName) {
   }
 
   if (hasProviderKey("google")) {
-    return { provider: "google" as const, model: "gemini-1.5-flash" };
+    return { provider: "google" as const, model: "gemini-2.5-flash" };
   }
 
   if (hasProviderKey("anthropic")) {

@@ -20,8 +20,9 @@ export async function runMagiPipeline(prompt: string, mode: MagiMode, emit: Emit
 
   if (!difficulty.complex) {
     activate("final", emit);
-    const answer = simpleAnswer(prompt);
-    emit({ type: "final", answer });
+    emit({ type: "status", step: "final", message: "Direct route selected. Generating answer..." });
+    const answer = await directAnswer(prompt, mode, emit);
+    emit({ type: "final", answer: `The Magi has decided.\n\n${answer}` });
     complete("final", emit);
     return;
   }
@@ -151,20 +152,44 @@ function scanDifficulty(prompt: string): DifficultyResult {
   };
 }
 
-function simpleAnswer(prompt: string) {
+async function directAnswer(prompt: string, mode: MagiMode, emit: Emit) {
   const trimmed = prompt.trim().toLowerCase();
   const math = trimmed.match(/^(\d+)\s*([+\-*/])\s*(\d+)$/);
   if (math) {
     const left = Number(math[1]);
     const right = Number(math[3]);
-    if (math[2] === "+") return String(left + right);
-    if (math[2] === "-") return String(left - right);
-    if (math[2] === "*") return String(left * right);
-    return right === 0 ? "undefined" : String(left / right);
+    const result =
+      math[2] === "+"
+        ? left + right
+        : math[2] === "-"
+          ? left - right
+          : math[2] === "*"
+            ? left * right
+            : right === 0
+              ? "undefined"
+              : left / right;
+    return String(result);
   }
 
   if (/^(hi|hello|hey)\b/.test(trimmed)) return "Hello. MAGI is online.";
-  return `The Magi has decided.\n\n${prompt.trim()}`;
+
+  const plan = getModelPlan(mode, "direct");
+  const answer = await generateText({
+    ...plan,
+    system:
+      "You are MAGI direct route. Answer the user's prompt directly, helpfully, and concisely. Do not repeat the prompt back unless quoting is necessary.",
+    prompt,
+    maxTokens: 900,
+    temperature: 0.35,
+  });
+
+  emit({
+    type: "node",
+    name: `Direct route (${answer.provider})`,
+    text: preview(answer.text),
+  });
+
+  return answer.text || "I could not generate an answer from the configured provider.";
 }
 
 async function runJudgeLikeNode(
