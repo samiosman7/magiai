@@ -1,4 +1,3 @@
-import { auth } from "@clerk/nextjs/server";
 import { checkCreditAccess } from "@/lib/billing/credits";
 import { runMagiPipeline } from "@/lib/magi/pipeline";
 import type { MagiEvent, MagiMode } from "@/lib/magi/types";
@@ -9,10 +8,7 @@ export const dynamic = "force-dynamic";
 const validModes = new Set(["economy", "standard", "premium"]);
 
 export async function POST(request: Request) {
-  const { userId } = await auth();
-  if (!userId) {
-    return Response.json({ error: "Authentication required." }, { status: 401 });
-  }
+  const userId = "local-test-user";
 
   const body = (await request.json().catch(() => null)) as {
     prompt?: unknown;
@@ -52,7 +48,7 @@ export async function POST(request: Request) {
         emit({
           type: "node",
           name: "Credit gate",
-          text: `${creditCheck.creditsRequired} credits authorized for ${mode} mode by operator ${userId}.`,
+          text: `${creditCheck.creditsRequired} credits authorized for ${mode} mode.`,
         });
         await runMagiPipeline(prompt, mode, emit);
       } catch (error) {

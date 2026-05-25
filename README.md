@@ -27,7 +27,6 @@ http://localhost:3000
 - Dual-signal reprompt loop
 - Mock mode for local development without paid API calls
 - Credit gate stub before model routing
-- Clerk sign-in and `/api/magi` auth protection
 
 ## Provider Setup
 
@@ -40,8 +39,6 @@ GOOGLE_API_KEY=
 GOOGLE_API_KEYS=
 DEEPSEEK_API_KEY=
 QWEN_API_KEY=
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
-CLERK_SECRET_KEY=
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 SUPABASE_SECRET_KEY=
@@ -64,7 +61,7 @@ Do not commit `.env.local`. If a key is pasted into chat or a public place, rota
 
 - Add Stripe Checkout and webhooks
 - Run `supabase/schema.sql` in Supabase SQL editor
-- Add signup webhook to create `magi_profiles` rows
+- Add auth and signup webhook to create `magi_profiles` rows
 - Deduct credits and save runs after `/api/magi` completes
 - Store dossiers and provider usage per run
 - Add per-user rate limits and monthly spend caps

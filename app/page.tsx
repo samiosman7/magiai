@@ -1,6 +1,5 @@
 "use client";
 
-import { SignInButton, SignedIn, SignedOut, UserButton, useUser } from "@clerk/nextjs";
 import { FormEvent, useMemo, useRef, useState } from "react";
 
 type PipelineStep = "scan" | "melchior" | "balthasar" | "casper" | "judge" | "final";
@@ -49,7 +48,6 @@ export default function Home() {
   const [nodeOutputs, setNodeOutputs] = useState<NodeOutput[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
-  const { isSignedIn, user } = useUser();
 
   const hasMessages = messages.length > 0;
 
@@ -63,17 +61,6 @@ export default function Home() {
     event.preventDefault();
     const trimmed = prompt.trim();
     if (!trimmed || isRunning) return;
-    if (!isSignedIn) {
-      setMessages((current) => [
-        ...current,
-        {
-          id: createId(),
-          kind: "status",
-          text: "Operator authentication required before MAGI can run.",
-        },
-      ]);
-      return;
-    }
 
     abortRef.current?.abort();
     const controller = new AbortController();
@@ -189,18 +176,10 @@ export default function Home() {
             Synced
           </div>
           <div className="auth-station" aria-label="Operator authentication">
-            <SignedIn>
-              <div>
-                <small>Operator</small>
-                <strong>{user?.primaryEmailAddress?.emailAddress ?? "Authenticated"}</strong>
-              </div>
-              <UserButton afterSignOutUrl="/" />
-            </SignedIn>
-            <SignedOut>
-              <SignInButton mode="modal">
-                <button type="button">Sign In</button>
-              </SignInButton>
-            </SignedOut>
+            <div>
+              <small>Operator</small>
+              <strong>Test Session</strong>
+            </div>
           </div>
         </header>
 
