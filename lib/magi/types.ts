@@ -1,0 +1,46 @@
+export type MagiMode = "economy" | "standard" | "premium";
+
+export type PipelineStep =
+  | "scan"
+  | "melchior"
+  | "balthasar"
+  | "casper"
+  | "judge"
+  | "final";
+
+export type ProviderName = "openai" | "anthropic" | "google" | "deepseek" | "qwen" | "mock";
+
+export type ModelCall = {
+  provider: ProviderName;
+  model: string;
+  system: string;
+  prompt: string;
+  maxTokens?: number;
+  temperature?: number;
+};
+
+export type ModelResult = {
+  text: string;
+  provider: ProviderName;
+  model: string;
+  isMock: boolean;
+};
+
+export type DifficultyResult = {
+  complex: boolean;
+  score: number;
+  reason: string;
+};
+
+export type JudgeResult = {
+  passed: boolean;
+  issue: string | null;
+  rationale: string;
+};
+
+export type MagiEvent =
+  | { type: "status"; step: PipelineStep; message: string }
+  | { type: "node"; name: string; text: string }
+  | { type: "step"; step: PipelineStep; state: "" | "active" | "done" }
+  | { type: "final"; answer: string }
+  | { type: "error"; message: string };
