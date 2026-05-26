@@ -9,6 +9,7 @@ type Message = {
   id: string;
   kind: "user" | "magi" | "status";
   text: string;
+  downloadPrompt?: string;
 };
 
 type NodeOutput = {
@@ -141,7 +142,12 @@ export default function Home() {
     if (event.type === "final") {
       setMessages((current) => [
         ...current,
-        { id: createId(), kind: "magi", text: event.answer },
+        {
+          id: createId(),
+          kind: "magi",
+          text: event.answer,
+          downloadPrompt: latestWebsitePrompt(current),
+        },
       ]);
       return;
     }
@@ -158,6 +164,36 @@ export default function Home() {
     setSteps(initialSteps);
     setNodeOutputs([]);
     setIsRunning(false);
+  }
+
+  async function downloadProject(downloadPrompt: string) {
+    const response = await fetch("/api/projects/download", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: downloadPrompt }),
+    });
+
+    if (!response.ok) {
+      setMessages((current) => [
+        ...current,
+        {
+          id: createId(),
+          kind: "status",
+          text: "Project download failed. Try again after the current run completes.",
+        },
+      ]);
+      return;
+    }
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "magi-site.zip";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
   }
 
   return (
@@ -208,6 +244,15 @@ export default function Home() {
             {messages.map((message) => (
               <article className={`message ${message.kind}`} key={message.id}>
                 {message.text}
+                {message.downloadPrompt && (
+                  <button
+                    className="download-button"
+                    type="button"
+                    onClick={() => downloadProject(message.downloadPrompt!)}
+                  >
+                    Download website files
+                  </button>
+                )}
               </article>
             ))}
           </div>
@@ -292,5 +337,19 @@ export default function Home() {
         </details>
       </aside>
     </main>
+  );
+}
+
+function latestWebsitePrompt(messages: Message[]) {
+  const userPrompt = [...messages].reverse().find((message) => message.kind === "user")?.text;
+  if (!userPrompt) return undefined;
+  return isWebsiteBuildPrompt(userPrompt) ? userPrompt : undefined;
+}
+
+function isWebsiteBuildPrompt(prompt: string) {
+  const lower = prompt.toLowerCase();
+  return (
+    /\b(build|create|make|generate|design)\b/.test(lower) &&
+    /\b(website|site|landing page|web page|homepage|portfolio)\b/.test(lower)
   );
 }

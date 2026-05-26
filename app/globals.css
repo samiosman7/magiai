@@ -342,6 +342,15 @@ h1 {
   text-transform: uppercase;
 }
 
+.download-button {
+  display: block;
+  width: fit-content;
+  margin-top: 16px;
+  padding: 11px 14px;
+  background: var(--amber);
+  color: #100d08;
+}
+
 .composer {
   display: grid;
   grid-template-columns: 140px minmax(0, 1fr) 116px;
