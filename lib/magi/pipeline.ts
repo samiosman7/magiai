@@ -5,6 +5,8 @@ import type { DifficultyResult, JudgeResult, MagiEvent, MagiMode, PipelineStep }
 type Emit = (event: MagiEvent) => void;
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const productContext =
+  "Product context: MAGI is this NERV-inspired AI orchestration product. It routes simple prompts directly and complex prompts through Melchior, Balthasar, Casper, and a Fact Judge. Unless the user clearly means another acronym, interpret MAGI as this product.";
 
 export async function runMagiPipeline(prompt: string, mode: MagiMode, emit: Emit) {
   activate("scan", emit);
@@ -32,8 +34,7 @@ export async function runMagiPipeline(prompt: string, mode: MagiMode, emit: Emit
   const melchiorPlan = getModelPlan(mode, "melchior");
   const melchior = await generateText({
     ...melchiorPlan,
-    system:
-      "You are Melchior, the correction and gap-filling node. Repair missing steps, identify assumptions, preserve the user's goal, and return a concise repaired draft.",
+    system: `${productContext}\n\nYou are Melchior, the correction and gap-filling node. Repair missing steps, identify assumptions, preserve the user's goal, and return a concise repaired draft.`,
     prompt,
     maxTokens: 900,
   });
@@ -45,8 +46,7 @@ export async function runMagiPipeline(prompt: string, mode: MagiMode, emit: Emit
   const balthasarPlan = getModelPlan(mode, "balthasar");
   const balthasar = await generateText({
     ...balthasarPlan,
-    system:
-      "You are Balthasar, the builder and hardener. Turn the repaired draft into a concrete, polished, directly usable answer. Do not mention internal deliberation.",
+    system: `${productContext}\n\nYou are Balthasar, the builder and hardener. Turn the repaired draft into a concrete, polished, directly usable answer. Do not mention internal deliberation.`,
     prompt: `Original prompt:\n${prompt}\n\nMelchior repaired draft:\n${melchior.text}`,
     maxTokens: 1200,
   });
@@ -62,14 +62,14 @@ export async function runMagiPipeline(prompt: string, mode: MagiMode, emit: Emit
     runJudgeLikeNode(
       mode,
       "casper",
-      "You are Casper, the intent-preservation and dramatic-change monitor. Return strict JSON with passed, issue, and rationale. Flag only if the answer drifts from the original request.",
+      `${productContext}\n\nYou are Casper, the intent-preservation and dramatic-change monitor. Return strict JSON with passed, issue, and rationale. Flag only if the answer drifts from the original request.`,
       prompt,
       balthasar.text
     ),
     runJudgeLikeNode(
       mode,
       "judge",
-      "You are a fresh, independent correctness judge. Return strict JSON with passed, issue, and rationale. Flag only blocking factual, logic, or instruction-following problems.",
+      `${productContext}\n\nYou are a fresh, independent correctness judge. Return strict JSON with passed, issue, and rationale. Flag only blocking factual, logic, or instruction-following problems.`,
       prompt,
       balthasar.text
     ),
@@ -100,8 +100,7 @@ export async function runMagiPipeline(prompt: string, mode: MagiMode, emit: Emit
     activate("balthasar", emit);
     const revision = await generateText({
       ...balthasarPlan,
-      system:
-        "You are Melchior and Balthasar in a correction loop. Fix the shared objection while preserving the user's intent. Return only the revised final answer.",
+      system: `${productContext}\n\nYou are Melchior and Balthasar in a correction loop. Fix the shared objection while preserving the user's intent. Return only the revised final answer.`,
       prompt: `Original prompt:\n${prompt}\n\nPrevious answer:\n${balthasar.text}\n\nShared objection:\n${sharedIssue}`,
       maxTokens: 1300,
     });
@@ -176,8 +175,7 @@ async function directAnswer(prompt: string, mode: MagiMode, emit: Emit) {
   const plan = getModelPlan(mode, "direct");
   const answer = await generateText({
     ...plan,
-    system:
-      "You are MAGI direct route. Answer the user's prompt directly, helpfully, and concisely. Do not repeat the prompt back unless quoting is necessary.",
+    system: `${productContext}\n\nYou are MAGI direct route. Answer the user's prompt directly, helpfully, and concisely. Do not repeat the prompt back unless quoting is necessary.`,
     prompt,
     maxTokens: 900,
     temperature: 0.35,
