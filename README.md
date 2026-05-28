@@ -28,6 +28,7 @@ http://localhost:3000
 - Mock mode for local development without paid API calls
 - Credit gate stub before model routing
 - File-based MAGI skill packs in `magi-skills/`
+- Agentic website ZIP generation using MAGI skills and MCP context
 
 ## Provider Setup
 
@@ -120,3 +121,11 @@ For local IDE clients, see `mcp.local.example.json`.
 - `magi-skills/product-strategy-growth/SKILL.md`
 
 Format references are listed in `magi-skills/REFERENCES.md`.
+
+Website downloads are now generated through the agentic project builder path:
+
+- loads MAGI `SKILL.md` files from `magi-skills/`
+- includes configured MCP server/tool context
+- asks the model for a JSON file manifest
+- validates/sanitizes files
+- falls back to a deterministic starter only if live generation fails

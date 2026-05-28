@@ -1,5 +1,5 @@
 import JSZip from "jszip";
-import { generateWebsiteProject } from "@/lib/projects/website-generator";
+import { generateAgenticWebsiteProject } from "@/lib/projects/agentic-project-generator";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,7 +12,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Prompt is required." }, { status: 400 });
   }
 
-  const project = generateWebsiteProject(prompt);
+  const project = await generateAgenticWebsiteProject(prompt);
   const zip = new JSZip();
 
   for (const file of project.files) {

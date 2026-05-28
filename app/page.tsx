@@ -232,6 +232,15 @@ export default function Home() {
   }
 
   async function downloadProject(downloadPrompt: string) {
+    setMessages((current) => [
+      ...current,
+      {
+        id: createId(),
+        kind: "status",
+        text: "Agentic project builder is generating downloadable files...",
+      },
+    ]);
+
     const response = await fetch("/api/projects/download", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -315,7 +324,7 @@ export default function Home() {
                     type="button"
                     onClick={() => downloadProject(message.downloadPrompt!)}
                   >
-                    Download website files
+                    Generate and download website files
                   </button>
                 )}
               </article>
