@@ -43,6 +43,7 @@ QWEN_API_KEY=
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 SUPABASE_SECRET_KEY=
+MCP_SERVERS_JSON=
 MAGI_MOCK_MODE=false
 MAGI_REQUIRE_BILLING=false
 ```
@@ -66,6 +67,30 @@ Do not commit `.env.local`. If a key is pasted into chat or a public place, rota
 - Deduct credits and save runs after `/api/magi` completes
 - Store dossiers and provider usage per run
 - Add per-user rate limits and monthly spend caps
+
+## MCP Servers
+
+MAGI supports remote Streamable HTTP MCP servers through `MCP_SERVERS_JSON`.
+
+Example:
+
+```json
+[
+  {
+    "name": "docs",
+    "url": "https://example.com/mcp",
+    "enabled": true
+  }
+]
+```
+
+Check configured MCP servers at:
+
+```text
+/api/mcp/servers
+```
+
+Stdio MCP servers are not enabled for Vercel production because serverless functions should not spawn long-lived local tool processes.
 
 ## MAGI Skill Packs
 

@@ -512,7 +512,8 @@ select:disabled {
   margin-top: 12px;
 }
 
-.skill-log {
+.skill-log,
+.mcp-log {
   display: grid;
   gap: 12px;
   margin-top: 12px;
@@ -524,14 +525,16 @@ select:disabled {
   background: #080a0b;
 }
 
-.skill-output {
+.skill-output,
+.mcp-output {
   padding: 11px;
   border-left: 4px solid var(--amber);
   background: #080a0b;
 }
 
 .node-output strong,
-.skill-output strong {
+.skill-output strong,
+.mcp-output strong {
   display: block;
   margin-bottom: 4px;
   color: var(--amber);
@@ -539,7 +542,8 @@ select:disabled {
   text-transform: uppercase;
 }
 
-.skill-output ul {
+.skill-output ul,
+.mcp-output ul {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
@@ -548,7 +552,8 @@ select:disabled {
   list-style: none;
 }
 
-.skill-output code {
+.skill-output code,
+.mcp-output code {
   display: block;
   margin-top: 4px;
   color: var(--muted);
@@ -556,13 +561,33 @@ select:disabled {
   overflow-wrap: anywhere;
 }
 
-.skill-output li {
+.skill-output li,
+.mcp-output li {
   padding: 5px 7px;
   border: 1px solid rgba(255, 201, 74, 0.35);
   color: var(--muted);
   font-family: Consolas, "Courier New", monospace;
   font-size: 0.72rem;
   text-transform: uppercase;
+}
+
+.mcp-output span {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 5px 7px;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.mcp-ok {
+  border: 1px solid rgba(93, 242, 133, 0.4);
+  color: var(--green);
+}
+
+.mcp-fail {
+  border: 1px solid rgba(229, 29, 38, 0.45);
+  color: var(--red);
 }
 
 .sr-only {

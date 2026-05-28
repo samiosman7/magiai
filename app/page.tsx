@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useRef, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 type PipelineStep = "scan" | "melchior" | "balthasar" | "casper" | "judge" | "final";
 type StepState = "" | "active" | "done";
@@ -21,6 +21,15 @@ type SkillOutput = {
   node: string;
   skills: string[];
   sourcePath?: string;
+};
+
+type McpServerStatus = {
+  name: string;
+  url: string;
+  enabled: boolean;
+  connected: boolean;
+  tools: Array<{ name: string; description?: string }>;
+  error?: string;
 };
 
 type MagiEvent =
@@ -55,6 +64,7 @@ export default function Home() {
   const [steps, setSteps] = useState<Record<PipelineStep, StepState>>(initialSteps);
   const [nodeOutputs, setNodeOutputs] = useState<NodeOutput[]>([]);
   const [skillOutputs, setSkillOutputs] = useState<SkillOutput[]>([]);
+  const [mcpServers, setMcpServers] = useState<McpServerStatus[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -65,6 +75,23 @@ export default function Home() {
     if (mode === "premium") return "Premium MAGI";
     return "Standard MAGI";
   }, [mode]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    fetch("/api/mcp/servers")
+      .then((response) => (response.ok ? response.json() : { servers: [] }))
+      .then((data: { servers?: McpServerStatus[] }) => {
+        if (mounted) setMcpServers(data.servers ?? []);
+      })
+      .catch(() => {
+        if (mounted) setMcpServers([]);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   async function submitPrompt(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -360,6 +387,33 @@ export default function Home() {
                       <li key={skill}>{skill}</li>
                     ))}
                   </ul>
+                </div>
+              ))
+            )}
+          </div>
+        </details>
+
+        <details className="node-card">
+          <summary>MCP servers</summary>
+          <div className="mcp-log">
+            {mcpServers.length === 0 ? (
+              <p>No MCP servers configured.</p>
+            ) : (
+              mcpServers.map((server) => (
+                <div className="mcp-output" key={server.name}>
+                  <strong>{server.name}</strong>
+                  <code>{server.url}</code>
+                  <span className={server.connected ? "mcp-ok" : "mcp-fail"}>
+                    {server.connected ? "Connected" : server.enabled ? "Unavailable" : "Disabled"}
+                  </span>
+                  {server.error && <p>{server.error}</p>}
+                  {server.tools.length > 0 && (
+                    <ul>
+                      {server.tools.map((tool) => (
+                        <li key={tool.name}>{tool.name}</li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               ))
             )}
