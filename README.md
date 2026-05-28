@@ -90,7 +90,23 @@ Check configured MCP servers at:
 /api/mcp/servers
 ```
 
+Check the curated MCP catalog at:
+
+```text
+/api/mcp/catalog
+```
+
+Included catalog entries:
+
+- 21st.dev Magic MCP for UI generation: https://github.com/21st-dev/magic-mcp
+- Microsoft Playwright MCP for browser automation: https://github.com/microsoft/playwright-mcp
+- Supabase MCP for database/backend operations: https://supabase.com/mcp
+- Context7 MCP for current documentation: https://github.com/truefoundry/context7-mcp-server
+- GitHub MCP for repository automation: https://github.com/github/github-mcp-server
+
 Stdio MCP servers are not enabled for Vercel production because serverless functions should not spawn long-lived local tool processes.
+
+For local IDE clients, see `mcp.local.example.json`.
 
 ## MAGI Skill Packs
 
@@ -98,5 +114,9 @@ Stdio MCP servers are not enabled for Vercel production because serverless funct
 - `magi-skills/balthasar-builder/SKILL.md`
 - `magi-skills/casper-guardian/SKILL.md`
 - `magi-skills/fact-judge-auditor/SKILL.md`
+- `magi-skills/ui-ux-product-design/SKILL.md`
+- `magi-skills/agentic-project-builder/SKILL.md`
+- `magi-skills/mcp-tool-orchestration/SKILL.md`
+- `magi-skills/product-strategy-growth/SKILL.md`
 
 Format references are listed in `magi-skills/REFERENCES.md`.

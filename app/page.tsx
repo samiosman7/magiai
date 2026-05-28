@@ -32,6 +32,16 @@ type McpServerStatus = {
   error?: string;
 };
 
+type McpCatalogEntry = {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  transport: string;
+  productionReadyOnVercel: boolean;
+  sourceUrl: string;
+};
+
 type MagiEvent =
   | { type: "status"; step: PipelineStep; message: string }
   | { type: "node"; name: string; text: string }
@@ -65,6 +75,7 @@ export default function Home() {
   const [nodeOutputs, setNodeOutputs] = useState<NodeOutput[]>([]);
   const [skillOutputs, setSkillOutputs] = useState<SkillOutput[]>([]);
   const [mcpServers, setMcpServers] = useState<McpServerStatus[]>([]);
+  const [mcpCatalog, setMcpCatalog] = useState<McpCatalogEntry[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -86,6 +97,15 @@ export default function Home() {
       })
       .catch(() => {
         if (mounted) setMcpServers([]);
+      });
+
+    fetch("/api/mcp/catalog")
+      .then((response) => (response.ok ? response.json() : { servers: [] }))
+      .then((data: { servers?: McpCatalogEntry[] }) => {
+        if (mounted) setMcpCatalog(data.servers ?? []);
+      })
+      .catch(() => {
+        if (mounted) setMcpCatalog([]);
       });
 
     return () => {
@@ -366,6 +386,29 @@ export default function Home() {
                 <div className="node-output" key={`${output.name}-${index}`}>
                   <strong>{output.name}</strong>
                   <span>{output.text}</span>
+                </div>
+              ))
+            )}
+          </div>
+        </details>
+
+        <details className="node-card">
+          <summary>MCP catalog</summary>
+          <div className="mcp-log">
+            {mcpCatalog.length === 0 ? (
+              <p>No MCP catalog entries loaded.</p>
+            ) : (
+              mcpCatalog.map((entry) => (
+                <div className="mcp-output" key={entry.id}>
+                  <strong>{entry.name}</strong>
+                  <code>{entry.category} | {entry.transport}</code>
+                  <p>{entry.description}</p>
+                  <a href={entry.sourceUrl} rel="noreferrer" target="_blank">
+                    Source
+                  </a>
+                  <span className={entry.productionReadyOnVercel ? "mcp-ok" : "mcp-fail"}>
+                    {entry.productionReadyOnVercel ? "Vercel-ready" : "Local/hosted needed"}
+                  </span>
                 </div>
               ))
             )}

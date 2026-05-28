@@ -580,6 +580,16 @@ select:disabled {
   text-transform: uppercase;
 }
 
+.mcp-output a {
+  display: inline-block;
+  margin-top: 8px;
+  margin-right: 8px;
+  color: var(--amber);
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
 .mcp-ok {
   border: 1px solid rgba(93, 242, 133, 0.4);
   color: var(--green);
