@@ -1,5 +1,6 @@
 import { getModelPlan } from "./model-plan";
 import { generateText } from "./providers";
+import { skillLabels, skillPackPaths, skillPrompt } from "./skills";
 import type { DifficultyResult, JudgeResult, MagiEvent, MagiMode, PipelineStep } from "./types";
 
 type Emit = (event: MagiEvent) => void;
@@ -30,11 +31,17 @@ export async function runMagiPipeline(prompt: string, mode: MagiMode, emit: Emit
   }
 
   activate("melchior", emit);
+  emit({
+    type: "skills",
+    node: "Melchior",
+    skills: skillLabels("melchior"),
+    sourcePath: skillPackPaths.melchior,
+  });
   emit({ type: "status", step: "melchior", message: "Melchior repairing gaps and missing reasoning..." });
   const melchiorPlan = getModelPlan(mode, "melchior");
   const melchior = await generateText({
     ...melchiorPlan,
-    system: `${productContext}\n\nYou are Melchior, the correction and gap-filling node. Repair missing steps, identify assumptions, preserve the user's goal, and return a concise repaired draft.`,
+    system: `${productContext}\n\nYou are Melchior, the correction and gap-filling node. Repair missing steps, identify assumptions, preserve the user's goal, and return a concise repaired draft.\n\n${skillPrompt("melchior")}`,
     prompt,
     maxTokens: 900,
   });
@@ -42,11 +49,17 @@ export async function runMagiPipeline(prompt: string, mode: MagiMode, emit: Emit
   complete("melchior", emit);
 
   activate("balthasar", emit);
+  emit({
+    type: "skills",
+    node: "Balthasar",
+    skills: skillLabels("balthasar"),
+    sourcePath: skillPackPaths.balthasar,
+  });
   emit({ type: "status", step: "balthasar", message: "Balthasar hardening the answer..." });
   const balthasarPlan = getModelPlan(mode, "balthasar");
   const balthasar = await generateText({
     ...balthasarPlan,
-    system: `${productContext}\n\nYou are Balthasar, the builder and hardener. Turn the repaired draft into a concrete, polished, directly usable answer. Do not mention internal deliberation.`,
+    system: `${productContext}\n\nYou are Balthasar, the builder and hardener. Turn the repaired draft into a concrete, polished, directly usable answer. Do not mention internal deliberation.\n\n${skillPrompt("balthasar")}`,
     prompt: `Original prompt:\n${prompt}\n\nMelchior repaired draft:\n${melchior.text}`,
     maxTokens: 1200,
   });
@@ -55,6 +68,18 @@ export async function runMagiPipeline(prompt: string, mode: MagiMode, emit: Emit
 
   activate("casper", emit);
   activate("judge", emit);
+  emit({
+    type: "skills",
+    node: "Casper",
+    skills: skillLabels("casper"),
+    sourcePath: skillPackPaths.casper,
+  });
+  emit({
+    type: "skills",
+    node: "Fact Judge",
+    skills: skillLabels("judge"),
+    sourcePath: skillPackPaths.judge,
+  });
   emit({ type: "status", step: "casper", message: "Casper checking intent drift..." });
   emit({ type: "status", step: "judge", message: "Fact Judge verifying correctness..." });
 
@@ -62,14 +87,14 @@ export async function runMagiPipeline(prompt: string, mode: MagiMode, emit: Emit
     runJudgeLikeNode(
       mode,
       "casper",
-      `${productContext}\n\nYou are Casper, the intent-preservation and dramatic-change monitor. Return strict JSON with passed, issue, and rationale. Flag only if the answer drifts from the original request.`,
+      `${productContext}\n\nYou are Casper, the intent-preservation and dramatic-change monitor. Return strict JSON with passed, issue, and rationale. Flag only if the answer drifts from the original request.\n\n${skillPrompt("casper")}`,
       prompt,
       balthasar.text
     ),
     runJudgeLikeNode(
       mode,
       "judge",
-      `${productContext}\n\nYou are a fresh, independent correctness judge. Return strict JSON with passed, issue, and rationale. Flag only blocking factual, logic, or instruction-following problems.`,
+      `${productContext}\n\nYou are a fresh, independent correctness judge. Return strict JSON with passed, issue, and rationale. Flag only blocking factual, logic, or instruction-following problems.\n\n${skillPrompt("judge")}`,
       prompt,
       balthasar.text
     ),
@@ -100,7 +125,7 @@ export async function runMagiPipeline(prompt: string, mode: MagiMode, emit: Emit
     activate("balthasar", emit);
     const revision = await generateText({
       ...balthasarPlan,
-      system: `${productContext}\n\nYou are Melchior and Balthasar in a correction loop. Fix the shared objection while preserving the user's intent. Return only the revised final answer.`,
+      system: `${productContext}\n\nYou are Melchior and Balthasar in a correction loop. Fix the shared objection while preserving the user's intent. Return only the revised final answer.\n\n${skillPrompt("melchior")}\n\n${skillPrompt("balthasar")}`,
       prompt: `Original prompt:\n${prompt}\n\nPrevious answer:\n${balthasar.text}\n\nShared objection:\n${sharedIssue}`,
       maxTokens: 1300,
     });

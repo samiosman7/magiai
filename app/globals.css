@@ -512,17 +512,56 @@ select:disabled {
   margin-top: 12px;
 }
 
+.skill-log {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
 .node-output {
   padding: 11px;
   border-left: 4px solid var(--red);
   background: #080a0b;
 }
 
-.node-output strong {
+.skill-output {
+  padding: 11px;
+  border-left: 4px solid var(--amber);
+  background: #080a0b;
+}
+
+.node-output strong,
+.skill-output strong {
   display: block;
   margin-bottom: 4px;
   color: var(--amber);
   font-family: Consolas, "Courier New", monospace;
+  text-transform: uppercase;
+}
+
+.skill-output ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0;
+  margin: 8px 0 0;
+  list-style: none;
+}
+
+.skill-output code {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  overflow-wrap: anywhere;
+}
+
+.skill-output li {
+  padding: 5px 7px;
+  border: 1px solid rgba(255, 201, 74, 0.35);
+  color: var(--muted);
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 0.72rem;
   text-transform: uppercase;
 }
 

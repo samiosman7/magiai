@@ -41,6 +41,7 @@ export type JudgeResult = {
 export type MagiEvent =
   | { type: "status"; step: PipelineStep; message: string }
   | { type: "node"; name: string; text: string }
+  | { type: "skills"; node: string; skills: string[]; sourcePath?: string }
   | { type: "step"; step: PipelineStep; state: "" | "active" | "done" }
   | { type: "final"; answer: string }
   | { type: "error"; message: string };

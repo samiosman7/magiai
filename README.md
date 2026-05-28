@@ -27,6 +27,7 @@ http://localhost:3000
 - Dual-signal reprompt loop
 - Mock mode for local development without paid API calls
 - Credit gate stub before model routing
+- File-based MAGI skill packs in `magi-skills/`
 
 ## Provider Setup
 
@@ -65,3 +66,12 @@ Do not commit `.env.local`. If a key is pasted into chat or a public place, rota
 - Deduct credits and save runs after `/api/magi` completes
 - Store dossiers and provider usage per run
 - Add per-user rate limits and monthly spend caps
+
+## MAGI Skill Packs
+
+- `magi-skills/melchior-diagnostics/SKILL.md`
+- `magi-skills/balthasar-builder/SKILL.md`
+- `magi-skills/casper-guardian/SKILL.md`
+- `magi-skills/fact-judge-auditor/SKILL.md`
+
+Format references are listed in `magi-skills/REFERENCES.md`.

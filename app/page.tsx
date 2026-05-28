@@ -17,9 +17,16 @@ type NodeOutput = {
   text: string;
 };
 
+type SkillOutput = {
+  node: string;
+  skills: string[];
+  sourcePath?: string;
+};
+
 type MagiEvent =
   | { type: "status"; step: PipelineStep; message: string }
   | { type: "node"; name: string; text: string }
+  | { type: "skills"; node: string; skills: string[]; sourcePath?: string }
   | { type: "step"; step: PipelineStep; state: StepState }
   | { type: "final"; answer: string }
   | { type: "error"; message: string };
@@ -47,6 +54,7 @@ export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [steps, setSteps] = useState<Record<PipelineStep, StepState>>(initialSteps);
   const [nodeOutputs, setNodeOutputs] = useState<NodeOutput[]>([]);
+  const [skillOutputs, setSkillOutputs] = useState<SkillOutput[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -71,6 +79,7 @@ export default function Home() {
     setMessages((current) => [...current, { id: createId(), kind: "user", text: trimmed }]);
     setSteps(initialSteps);
     setNodeOutputs([]);
+    setSkillOutputs([]);
 
     try {
       const response = await fetch("/api/magi", {
@@ -134,6 +143,14 @@ export default function Home() {
       return;
     }
 
+    if (event.type === "skills") {
+      setSkillOutputs((current) => [
+        ...current.filter((output) => output.node !== event.node),
+        { node: event.node, skills: event.skills, sourcePath: event.sourcePath },
+      ]);
+      return;
+    }
+
     if (event.type === "step") {
       setSteps((current) => ({ ...current, [event.step]: event.state }));
       return;
@@ -163,6 +180,7 @@ export default function Home() {
     setMessages([]);
     setSteps(initialSteps);
     setNodeOutputs([]);
+    setSkillOutputs([]);
     setIsRunning(false);
   }
 
@@ -321,6 +339,27 @@ export default function Home() {
                 <div className="node-output" key={`${output.name}-${index}`}>
                   <strong>{output.name}</strong>
                   <span>{output.text}</span>
+                </div>
+              ))
+            )}
+          </div>
+        </details>
+
+        <details className="node-card">
+          <summary>Active skills</summary>
+          <div className="skill-log">
+            {skillOutputs.length === 0 ? (
+              <p>No skills activated yet.</p>
+            ) : (
+              skillOutputs.map((output) => (
+                <div className="skill-output" key={output.node}>
+                  <strong>{output.node}</strong>
+                  {output.sourcePath && <code>{output.sourcePath}</code>}
+                  <ul>
+                    {output.skills.map((skill) => (
+                      <li key={skill}>{skill}</li>
+                    ))}
+                  </ul>
                 </div>
               ))
             )}
