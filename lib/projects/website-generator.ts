@@ -12,6 +12,7 @@ export type GeneratedProject = {
 type SiteProfile = {
   title: string;
   slug: string;
+  headline: string;
   audience: string;
   category: string;
   offer: string;
@@ -57,6 +58,8 @@ function inferProfile(prompt: string): SiteProfile {
   const title = inferTitle(prompt);
   const category = lower.includes("detailing") || lower.includes("car")
     ? "premium mobile detailing"
+    : lower.includes("bakery") || lower.includes("baker") || lower.includes("pastry") || lower.includes("cake")
+      ? "neighborhood bakery"
     : lower.includes("restaurant")
       ? "modern hospitality"
       : lower.includes("portfolio")
@@ -67,18 +70,42 @@ function inferProfile(prompt: string): SiteProfile {
 
   const luxury = lower.includes("luxury") || lower.includes("premium") || lower.includes("detailing");
   const tech = lower.includes("saas") || lower.includes("startup") || lower.includes("ai") || lower.includes("software");
+  const bakery = lower.includes("bakery") || lower.includes("baker") || lower.includes("pastry") || lower.includes("cake");
   const clean = lower.includes("medical") || lower.includes("clean") || lower.includes("wellness");
 
   return {
     title,
     slug: slugify(title),
+    headline: inferHeadline(lower),
     audience: inferAudience(lower),
     category,
     offer: inferOffer(lower),
-    primaryCta: lower.includes("booking") || lower.includes("detailing") ? "Book a detail" : "Start a project",
-    secondaryCta: lower.includes("packages") || lower.includes("pricing") ? "View packages" : "See the proof",
-    proofMetric: lower.includes("detailing") || lower.includes("car") ? "142 five-star appointments" : "3x faster path to launch",
-    palette: luxury
+    primaryCta: bakery
+      ? "Order for pickup"
+      : lower.includes("booking") || lower.includes("detailing")
+        ? "Book a detail"
+        : "Start a project",
+    secondaryCta: bakery
+      ? "View the menu"
+      : lower.includes("packages") || lower.includes("pricing")
+        ? "View packages"
+        : "See the proof",
+    proofMetric: bakery
+      ? "Fresh batches by 7am"
+      : lower.includes("detailing") || lower.includes("car")
+        ? "142 five-star appointments"
+        : "3x faster path to launch",
+    palette: bakery
+      ? {
+          bg: "#fff7ec",
+          surface: "#ffffff",
+          surface2: "#f5dfc5",
+          ink: "#2b160d",
+          muted: "#795f4d",
+          accent: "#c46a2d",
+          accent2: "#7f3f21",
+        }
+      : luxury
       ? {
           bg: "#070604",
           surface: "#11100d",
@@ -132,14 +159,29 @@ function inferTitle(prompt: string) {
 
   const lower = prompt.toLowerCase();
   if (lower.includes("detailing")) return "Apex Mobile Detail";
+  if (lower.includes("bakery") || lower.includes("baker") || lower.includes("pastry") || lower.includes("cake")) return "A Bakery";
   if (lower.includes("restaurant")) return "Tableline";
   if (lower.includes("portfolio")) return "Signal Portfolio";
   if (lower.includes("saas") || lower.includes("ai")) return "Launchgrid";
   return "Magi Studio";
 }
 
+function inferHeadline(lower: string) {
+  if (lower.includes("bakery") || lower.includes("baker") || lower.includes("pastry") || lower.includes("cake")) {
+    return "Fresh bread, celebration cakes, and pastries worth crossing town for.";
+  }
+  if (lower.includes("detailing") || lower.includes("car")) return "Showroom-level detail, without leaving the driveway.";
+  if (lower.includes("restaurant")) return "A table people remember before the first bite.";
+  if (lower.includes("portfolio")) return "A sharper way to show the work behind your taste.";
+  if (lower.includes("saas") || lower.includes("startup")) return "Explain the product fast, then make the demo feel obvious.";
+  return "A clearer offer, stronger proof, and one obvious next step.";
+}
+
 function inferAudience(lower: string) {
   if (lower.includes("detailing") || lower.includes("car")) return "busy owners who want showroom results at home";
+  if (lower.includes("bakery") || lower.includes("baker") || lower.includes("pastry") || lower.includes("cake")) {
+    return "locals planning breakfast, office treats, and weekend celebrations";
+  }
   if (lower.includes("restaurant")) return "guests choosing where to book tonight";
   if (lower.includes("portfolio")) return "clients deciding whether to trust your taste";
   if (lower.includes("saas") || lower.includes("startup")) return "teams comparing serious tools";
@@ -149,6 +191,9 @@ function inferAudience(lower: string) {
 function inferOffer(lower: string) {
   if (lower.includes("detailing") || lower.includes("car")) {
     return "mobile detailing packages with paint-safe washes, interior restoration, ceramic protection, and appointment-first convenience";
+  }
+  if (lower.includes("bakery") || lower.includes("baker") || lower.includes("pastry") || lower.includes("cake")) {
+    return "daily sourdough, laminated pastries, custom cakes, and preorder boxes made for pickup, gifting, and catering";
   }
   if (lower.includes("restaurant")) return "a dining experience with memorable plates, easy reservations, and a confident local brand";
   if (lower.includes("portfolio")) return "a curated body of work with clear case studies, services, and contact paths";
@@ -184,7 +229,7 @@ function html(profile: SiteProfile) {
       <section class="hero">
         <div class="hero-copy">
           <p class="eyebrow">${escapeHtml(profile.category)}</p>
-          <h1>Make the first impression feel already decided.</h1>
+          <h1>${escapeHtml(profile.headline)}</h1>
           <p class="lede">${escapeHtml(profile.offer)} for ${escapeHtml(profile.audience)}.</p>
           <div class="actions">
             <a class="button" href="#contact">${escapeHtml(profile.primaryCta)}</a>

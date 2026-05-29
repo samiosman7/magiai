@@ -1,5 +1,6 @@
 import { getModelPlan } from "@/lib/magi/model-plan";
 import { generateText } from "@/lib/magi/providers";
+import type { GeminiModel } from "@/lib/magi/types";
 import { buildMcpContext, projectSkillPaths } from "@/lib/magi/runtime-context";
 import { loadSkillPacks } from "@/lib/magi/skill-loader";
 import { queryMagicUiInspiration } from "@/lib/mcp/client";
@@ -11,50 +12,87 @@ type ProjectManifest = {
   files?: GeneratedFile[];
 };
 
-export async function generateAgenticWebsiteProject(prompt: string): Promise<GeneratedProject> {
+export async function generateAgenticWebsiteProject(
+  prompt: string,
+  geminiModel?: GeminiModel
+): Promise<GeneratedProject> {
   try {
     const [skillContext, mcp, magicUiContext] = await Promise.all([
       loadSkillPacks(projectSkillPaths),
       buildMcpContext(),
       queryMagicUiInspiration(prompt).catch(() => null),
     ]);
-    const plan = getModelPlan("standard", "balthasar");
+    const plan = getModelPlan("standard", "balthasar", geminiModel);
+    const system = [
+      "You are MAGI's agentic project builder.",
+      "Generate a polished, premium, downloadable static website project from the user's request.",
+      "Use the loaded MAGI skill packs as operating instructions.",
+      "Use MCP context to understand available external tools, but do not claim you used a tool unless it is listed as connected.",
+      "Return only valid JSON. No markdown fences.",
+      "The JSON must match: {\"title\":\"string\",\"slug\":\"kebab-case\",\"files\":[{\"path\":\"index.html\",\"content\":\"...\"},{\"path\":\"styles.css\",\"content\":\"...\"},{\"path\":\"script.js\",\"content\":\"...\"},{\"path\":\"README.md\",\"content\":\"...\"}]}",
+      "All files must be complete. The site must work by opening index.html directly in a browser.",
+      "Do not include remote build steps, package managers, or framework-only files in this first downloadable version.",
+      "Avoid placeholder copy like lorem ipsum. Make the result specific to the prompt.",
+      "Quality bar: the site must feel like a real agency-grade first draft, not a boilerplate starter.",
+      "Absolutely do not use this generic headline: 'Make the first impression feel already decided.'",
+      "Absolutely do not use generic labels like 'high-conversion service' unless the user specifically asks for a conversion agency.",
+      "Design the site for the actual business category. A bakery should feel bakery-specific: menu/products, preorder/catering, pickup hours, photography-ready product blocks, warm food palette, seasonal goods, and local trust.",
+      "Design requirements: strong first viewport, clear navigation, real offer sections, proof/testimonial section, pricing/menu or packages when relevant, FAQ, contact/CTA, responsive mobile layout, polished spacing, and deliberate typography.",
+      "Do not use generic copy such as 'turns attention into action', 'ready for real content', or 'replace this copy'.",
+      "Do not use single-color bland palettes. Use a coherent palette with background, surface, text, accent, and muted colors.",
+      "Use CSS variables, responsive grids, hover states, and professional button/card treatments.",
+      "If 21st.dev Magic context is available, adapt it as design inspiration instead of copying unrelated component imports that will not run in a static HTML site.",
+      "If the prompt asks for a service business, include service packages, trust proof, process, and booking CTA.",
+      "If the prompt asks for SaaS/software, include product workflow, feature comparison, metrics, and demo CTA.",
+      "",
+      skillContext,
+      "",
+      mcp.context,
+      "",
+      "Website/UI MCP tool execution context:",
+      magicUiContext || "No 21st.dev Magic bridge tool output was available for this generation.",
+    ].join("\n");
+
     const response = await generateText({
       ...plan,
-      system: [
-        "You are MAGI's agentic project builder.",
-        "Generate a polished, premium, downloadable static website project from the user's request.",
-        "Use the loaded MAGI skill packs as operating instructions.",
-        "Use MCP context to understand available external tools, but do not claim you used a tool unless it is listed as connected.",
-        "Return only valid JSON. No markdown fences.",
-        "The JSON must match: {\"title\":\"string\",\"slug\":\"kebab-case\",\"files\":[{\"path\":\"index.html\",\"content\":\"...\"},{\"path\":\"styles.css\",\"content\":\"...\"},{\"path\":\"script.js\",\"content\":\"...\"},{\"path\":\"README.md\",\"content\":\"...\"}]}",
-        "All files must be complete. The site must work by opening index.html directly in a browser.",
-        "Do not include remote build steps, package managers, or framework-only files in this first downloadable version.",
-        "Avoid placeholder copy like lorem ipsum. Make the result specific to the prompt.",
-        "Quality bar: the site must feel like a real agency-grade first draft, not a boilerplate starter.",
-        "Design requirements: strong first viewport, clear navigation, real offer sections, proof/testimonial section, pricing or packages when relevant, FAQ, contact/CTA, responsive mobile layout, polished spacing, and deliberate typography.",
-        "Do not use generic copy such as 'turns attention into action', 'ready for real content', or 'replace this copy'.",
-        "Do not use single-color bland palettes. Use a coherent palette with background, surface, text, accent, and muted colors.",
-        "Use CSS variables, responsive grids, hover states, and professional button/card treatments.",
-        "If the prompt asks for a service business, include service packages, trust proof, process, and booking CTA.",
-        "If the prompt asks for SaaS/software, include product workflow, feature comparison, metrics, and demo CTA.",
-        "",
-        skillContext,
-        "",
-        mcp.context,
-        "",
-        "Website/UI MCP tool execution context:",
-        magicUiContext || "No 21st.dev Magic bridge tool output was available for this generation.",
-      ].join("\n"),
+      system,
       prompt: `Build a downloadable website project for this request:\n${prompt}`,
       maxTokens: 5000,
       temperature: 0.45,
     });
 
-    const parsed = parseProjectManifest(response.text);
-    return sanitizeProject(parsed, prompt);
+    const parsed = await parseOrRepairProjectManifest(response.text, prompt, system, plan);
+    const project = sanitizeProject(parsed, prompt);
+    assertNotGenericTemplate(project);
+    return project;
   } catch {
     return generateWebsiteProject(prompt);
+  }
+}
+
+async function parseOrRepairProjectManifest(
+  text: string,
+  prompt: string,
+  system: string,
+  plan: ReturnType<typeof getModelPlan>
+) {
+  try {
+    return parseProjectManifest(text);
+  } catch {
+    const repair = await generateText({
+      ...plan,
+      system: [
+        system,
+        "",
+        "Your previous response was not valid project JSON. Repair it now.",
+        "Return only valid JSON matching the required manifest shape. No commentary.",
+      ].join("\n"),
+      prompt: `Original website request:\n${prompt}\n\nInvalid response to repair:\n${text.slice(0, 12000)}`,
+      maxTokens: 5000,
+      temperature: 0.15,
+    });
+
+    return parseProjectManifest(repair.text);
   }
 }
 
@@ -91,6 +129,20 @@ function sanitizeProject(project: ProjectManifest, prompt: string): GeneratedPro
   if (!files.some((file) => file.path === "README.md")) files.push(fallback.files[3]);
 
   return { title, slug, files };
+}
+
+function assertNotGenericTemplate(project: GeneratedProject) {
+  const combined = project.files.map((file) => file.content).join("\n").toLowerCase();
+  const blocked = [
+    "make the first impression feel already decided",
+    "high-conversion service",
+    "3x faster path to launch",
+    "a polished service offer with proof, packages",
+  ];
+
+  if (blocked.some((phrase) => combined.includes(phrase))) {
+    throw new Error("Generic website template leaked into generated output.");
+  }
 }
 
 function sanitizeFiles(files: ProjectManifest["files"]) {

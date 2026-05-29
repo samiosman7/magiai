@@ -245,7 +245,7 @@ export default function Home() {
     const response = await fetch("/api/projects/download", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt: downloadPrompt }),
+      body: JSON.stringify({ prompt: downloadPrompt, geminiModel }),
     });
 
     if (!response.ok) {
