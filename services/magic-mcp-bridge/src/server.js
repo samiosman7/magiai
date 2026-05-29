@@ -23,10 +23,9 @@ const MAGIC_API_KEY =
   process.env.API_KEY ||
   "";
 
-const transports = new Map();
-
 const app = createMcpExpressApp({ host: HOST });
 app.use(cors({ origin: true }));
+const transports = new Map();
 
 app.get("/", (_req, res) => {
   res.type("text/plain").send("MAGI 21st.dev Magic MCP bridge is online. Use /mcp.");
@@ -40,6 +39,7 @@ app.get("/health", (_req, res) => {
     args: MAGIC_ARGS,
     hasMagicApiKey: Boolean(MAGIC_API_KEY),
     authEnabled: Boolean(BRIDGE_TOKEN),
+    transport: "streamable-http-stateful",
     sessions: transports.size,
   });
 });
@@ -67,6 +67,10 @@ app.post("/mcp", requireBridgeAuth, async (req, res) => {
 
       await server.connect(transport);
       await transport.handleRequest(req, res, req.body);
+
+      if (transport.sessionId) {
+        transports.set(transport.sessionId, transport);
+      }
       return;
     }
 
@@ -110,16 +114,14 @@ app.get("/mcp", requireBridgeAuth, async (req, res) => {
   await transport.handleRequest(req, res);
 });
 
-const httpServer = app.listen(PORT, HOST, () => {
-  console.log(`MAGI Magic MCP bridge listening on http://${HOST}:${PORT}/mcp`);
-});
+let httpServer;
 
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
 
 async function shutdown() {
   console.log("Shutting down MAGI Magic MCP bridge...");
-  httpServer.close();
+  httpServer?.close();
   await Promise.allSettled([...transports.values()].map((transport) => transport.close()));
   transports.clear();
   process.exit(0);
@@ -247,3 +249,7 @@ function parseArgs(value) {
 
   return null;
 }
+
+httpServer = app.listen(PORT, HOST, () => {
+  console.log(`MAGI Magic MCP bridge listening on http://${HOST}:${PORT}/mcp`);
+});
