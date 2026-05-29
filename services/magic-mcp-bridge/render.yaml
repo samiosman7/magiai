@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: magi-magic-mcp-bridge
+    runtime: docker
+    plan: starter
+    rootDir: services/magic-mcp-bridge
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: MAGIC_API_KEY
+        sync: false
+      - key: BRIDGE_TOKEN
+        generateValue: true

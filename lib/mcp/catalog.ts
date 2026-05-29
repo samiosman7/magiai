@@ -31,6 +31,7 @@ export const mcpCatalog: McpCatalogEntry[] = [
     notes: [
       "Best used in local IDE agents such as Cursor, Windsurf, Cline, or Claude Desktop.",
       "Not enabled directly on Vercel because it is stdio/local-process oriented.",
+      "Can be used by MAGI in production through the services/magic-mcp-bridge remote HTTP bridge.",
     ],
   },
   {

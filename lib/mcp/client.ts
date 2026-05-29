@@ -75,6 +75,58 @@ export async function queryContext7Docs(prompt: string): Promise<string | null> 
   }
 }
 
+export async function queryMagicUiInspiration(prompt: string): Promise<string | null> {
+  if (!isUiPrompt(prompt)) return null;
+
+  const config = getMcpServerConfigs().find(
+    (server) =>
+      server.enabled &&
+      /(21st|magic)/i.test(server.name) &&
+      !server.url.includes("context7")
+  );
+  if (!config) return null;
+
+  const client = new Client({ name: "magi-magic-client", version: "0.1.0" });
+  const transport = new StreamableHTTPClientTransport(new URL(config.url), {
+    requestInit: {
+      headers: config.headers,
+    },
+  });
+
+  try {
+    await client.connect(transport, { timeout: 20_000 });
+    const tools = await client.listTools(undefined, { timeout: 20_000 });
+    const hasInspirationTool = tools.tools?.some(
+      (tool) => tool.name === "21st_magic_component_inspiration"
+    );
+    if (!hasInspirationTool) return null;
+
+    const result = await client.callTool(
+      {
+        name: "21st_magic_component_inspiration",
+        arguments: {
+          message: redactSensitiveText(prompt).slice(0, 1200),
+          searchQuery: inferMagicSearchQuery(prompt),
+        },
+      },
+      undefined,
+      { timeout: 60_000 }
+    );
+
+    const text = extractText(result.content).slice(0, 6000);
+    if (!text.trim()) return null;
+
+    return [
+      "Executed MCP tool: 21st.dev Magic 21st_magic_component_inspiration.",
+      text,
+    ].join("\n");
+  } catch {
+    return null;
+  } finally {
+    await client.close().catch(() => undefined);
+  }
+}
+
 async function readMcpServerStatus(config: McpServerConfig): Promise<McpServerStatus> {
   if (!config.enabled) {
     return {
@@ -142,6 +194,36 @@ function inferLibraryName(prompt: string) {
   ];
 
   return candidates.find(([pattern]) => pattern.test(lower))?.[1] ?? null;
+}
+
+function isUiPrompt(prompt: string) {
+  const lower = prompt.toLowerCase();
+  return (
+    /\b(ui|ux|interface|component|button|card|modal|dialog|form|table|dashboard|sidebar|navbar|landing page|website|homepage|pricing|hero)\b/.test(
+      lower
+    ) &&
+    /\b(build|create|make|generate|design|improve|refine|redesign|inspiration|website|page|component)\b/.test(
+      lower
+    )
+  );
+}
+
+function inferMagicSearchQuery(prompt: string) {
+  const lower = prompt.toLowerCase();
+  const matches: Array<[RegExp, string]> = [
+    [/\bpricing\b/, "pricing cards"],
+    [/\bdashboard\b/, "dashboard ui"],
+    [/\bsidebar\b/, "sidebar navigation"],
+    [/\bnavbar|navigation\b/, "navbar"],
+    [/\bhero\b/, "hero section"],
+    [/\bform|booking|contact\b/, "booking form"],
+    [/\bmodal|dialog\b/, "modal dialog"],
+    [/\bcard|cards\b/, "feature cards"],
+    [/\btable\b/, "data table"],
+    [/\blanding page|homepage|website\b/, "landing page"],
+  ];
+
+  return matches.find(([pattern]) => pattern.test(lower))?.[1] ?? "modern ui";
 }
 
 function redactSensitiveText(value: string) {

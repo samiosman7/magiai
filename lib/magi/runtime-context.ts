@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getMcpServerStatuses, queryContext7Docs } from "@/lib/mcp/client";
+import { getMcpServerStatuses, queryContext7Docs, queryMagicUiInspiration } from "@/lib/mcp/client";
 import { mcpCatalog } from "@/lib/mcp/catalog";
 import { skillPackPaths, type MagiNode } from "./skills";
 import { loadSkillPacks } from "./skill-loader";
@@ -26,7 +26,7 @@ export type MagiRuntimeContext = {
 };
 
 export async function buildMagiRuntimeContext(prompt: string): Promise<MagiRuntimeContext> {
-  const [melchior, balthasar, casper, judge, projectSkillContext, mcp, mcpToolContext] =
+  const [melchior, balthasar, casper, judge, projectSkillContext, mcp, context7, magic] =
     await Promise.all([
       loadSkillPacks([skillPackPaths.melchior]),
       loadSkillPacks([skillPackPaths.balthasar]),
@@ -35,7 +35,10 @@ export async function buildMagiRuntimeContext(prompt: string): Promise<MagiRunti
       loadSkillPacks(projectSkillPaths),
       buildMcpContext(),
       queryContext7Docs(prompt).catch(() => null),
+      queryMagicUiInspiration(prompt).catch(() => null),
     ]);
+
+  const mcpToolContext = [context7, magic].filter(Boolean).join("\n\n");
 
   return {
     nodeSkillContext: {
