@@ -1,4 +1,4 @@
-import type { MagiMode, ModelCall, ProviderName } from "./types";
+import type { GeminiModel, MagiMode, ModelCall, ProviderName } from "./types";
 import { hasProviderKeys } from "./provider-keys";
 
 type NodeName = "direct" | "melchior" | "balthasar" | "casper" | "judge";
@@ -27,16 +27,16 @@ const plans: Record<MagiMode, Record<NodeName, Pick<ModelCall, "provider" | "mod
   },
 };
 
-export function getModelPlan(mode: MagiMode, node: NodeName) {
+export function getModelPlan(mode: MagiMode, node: NodeName, geminiModel?: GeminiModel) {
   const target = plans[mode][node];
-  if (hasProviderKey(target.provider)) return target;
+  if (hasProviderKey(target.provider)) return applyGeminiOverride(target, geminiModel);
 
   if (hasProviderKey("openai")) {
     return { provider: "openai" as const, model: "gpt-4o-mini" };
   }
 
   if (hasProviderKey("google")) {
-    return { provider: "google" as const, model: "gemini-2.5-flash" };
+    return { provider: "google" as const, model: geminiModel ?? "gemini-2.5-flash" };
   }
 
   if (hasProviderKey("anthropic")) {
@@ -44,6 +44,14 @@ export function getModelPlan(mode: MagiMode, node: NodeName) {
   }
 
   return { provider: "mock" as const, model: "magi-mock" };
+}
+
+function applyGeminiOverride(
+  target: Pick<ModelCall, "provider" | "model">,
+  geminiModel?: GeminiModel
+) {
+  if (target.provider !== "google" || !geminiModel) return target;
+  return { ...target, model: geminiModel };
 }
 
 function hasProviderKey(provider: ProviderName) {

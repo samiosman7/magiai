@@ -386,7 +386,7 @@ h1 {
 
 .composer {
   display: grid;
-  grid-template-columns: 148px minmax(0, 1fr) 124px;
+  grid-template-columns: 132px 170px minmax(0, 1fr) 124px;
   gap: 10px;
   padding: 14px;
   border-top: 1px solid var(--line);

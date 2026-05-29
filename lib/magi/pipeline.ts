@@ -2,7 +2,7 @@ import { getModelPlan } from "./model-plan";
 import { generateText } from "./providers";
 import { buildMagiRuntimeContext } from "./runtime-context";
 import { skillLabels, skillPackPaths, skillPrompt } from "./skills";
-import type { DifficultyResult, JudgeResult, MagiEvent, MagiMode, PipelineStep } from "./types";
+import type { DifficultyResult, GeminiModel, JudgeResult, MagiEvent, MagiMode, PipelineStep } from "./types";
 
 type Emit = (event: MagiEvent) => void;
 
@@ -10,7 +10,12 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const productContext =
   "Product context: MAGI is this NERV-inspired AI orchestration product. It routes simple prompts directly and complex prompts through Melchior, Balthasar, Casper, and a Fact Judge. Unless the user clearly means another acronym, interpret MAGI as this product.";
 
-export async function runMagiPipeline(prompt: string, mode: MagiMode, emit: Emit) {
+export async function runMagiPipeline(
+  prompt: string,
+  mode: MagiMode,
+  emit: Emit,
+  geminiModel?: GeminiModel
+) {
   activate("scan", emit);
   emit({ type: "status", step: "scan", message: "Difficulty scan running..." });
   const [difficulty, runtimeContext] = await Promise.all([
@@ -40,7 +45,7 @@ export async function runMagiPipeline(prompt: string, mode: MagiMode, emit: Emit
   if (!difficulty.complex) {
     activate("final", emit);
     emit({ type: "status", step: "final", message: "Direct route selected. Generating answer..." });
-    const answer = await directAnswer(prompt, mode, emit);
+    const answer = await directAnswer(prompt, mode, emit, geminiModel);
     emit({ type: "final", answer: `The Magi has decided.\n\n${answer}` });
     complete("final", emit);
     return;
@@ -54,7 +59,7 @@ export async function runMagiPipeline(prompt: string, mode: MagiMode, emit: Emit
     sourcePath: skillPackPaths.melchior,
   });
   emit({ type: "status", step: "melchior", message: "Melchior repairing gaps and missing reasoning..." });
-  const melchiorPlan = getModelPlan(mode, "melchior");
+  const melchiorPlan = getModelPlan(mode, "melchior", geminiModel);
   const melchior = await generateText({
     ...melchiorPlan,
     system: `${productContext}\n\nYou are Melchior, the correction and gap-filling node. Repair missing steps, identify assumptions, preserve the user's goal, and return a concise repaired draft.\n\n${skillPrompt("melchior")}\n\nFull Melchior SKILL.md:\n${runtimeContext.nodeSkillContext.melchior}\n\n${runtimeContext.mcpContext}\n\nMCP tool execution context:\n${runtimeContext.mcpToolContext}`,
@@ -72,7 +77,7 @@ export async function runMagiPipeline(prompt: string, mode: MagiMode, emit: Emit
     sourcePath: skillPackPaths.balthasar,
   });
   emit({ type: "status", step: "balthasar", message: "Balthasar hardening the answer..." });
-  const balthasarPlan = getModelPlan(mode, "balthasar");
+  const balthasarPlan = getModelPlan(mode, "balthasar", geminiModel);
   const balthasar = await generateText({
     ...balthasarPlan,
     system: `${productContext}\n\nYou are Balthasar, the builder and hardener. Turn the repaired draft into a concrete, polished, directly usable answer. Do not mention internal deliberation.\n\n${skillPrompt("balthasar")}\n\nFull Balthasar SKILL.md:\n${runtimeContext.nodeSkillContext.balthasar}\n\nProject and cross-functional skill packs:\n${runtimeContext.projectSkillContext}\n\n${runtimeContext.mcpContext}\n\nMCP tool execution context:\n${runtimeContext.mcpToolContext}`,
@@ -105,14 +110,16 @@ export async function runMagiPipeline(prompt: string, mode: MagiMode, emit: Emit
       "casper",
       `${productContext}\n\nYou are Casper, the intent-preservation and dramatic-change monitor. Return strict JSON with passed, issue, and rationale. Flag only if the answer drifts from the original request.\n\n${skillPrompt("casper")}\n\nFull Casper SKILL.md:\n${runtimeContext.nodeSkillContext.casper}\n\n${runtimeContext.mcpContext}\n\nMCP tool execution context:\n${runtimeContext.mcpToolContext}`,
       prompt,
-      balthasar.text
+      balthasar.text,
+      geminiModel
     ),
     runJudgeLikeNode(
       mode,
       "judge",
       `${productContext}\n\nYou are a fresh, independent correctness judge. Return strict JSON with passed, issue, and rationale. Flag only blocking factual, logic, or instruction-following problems.\n\n${skillPrompt("judge")}\n\nFull Fact Judge SKILL.md:\n${runtimeContext.nodeSkillContext.judge}\n\n${runtimeContext.mcpContext}\n\nMCP tool execution context:\n${runtimeContext.mcpToolContext}`,
       prompt,
-      balthasar.text
+      balthasar.text,
+      geminiModel
     ),
   ]);
 
@@ -192,7 +199,12 @@ function scanDifficulty(prompt: string): DifficultyResult {
   };
 }
 
-async function directAnswer(prompt: string, mode: MagiMode, emit: Emit) {
+async function directAnswer(
+  prompt: string,
+  mode: MagiMode,
+  emit: Emit,
+  geminiModel?: GeminiModel
+) {
   const trimmed = prompt.trim().toLowerCase();
   const math = trimmed.match(/^(\d+)\s*([+\-*/])\s*(\d+)$/);
   if (math) {
@@ -213,7 +225,7 @@ async function directAnswer(prompt: string, mode: MagiMode, emit: Emit) {
 
   if (/^(hi|hello|hey)\b/.test(trimmed)) return "Hello. MAGI is online.";
 
-  const plan = getModelPlan(mode, "direct");
+  const plan = getModelPlan(mode, "direct", geminiModel);
   const answer = await generateText({
     ...plan,
     system: `${productContext}\n\nYou are MAGI direct route. Answer the user's prompt directly, helpfully, and concisely. Do not repeat the prompt back unless quoting is necessary.`,
@@ -236,9 +248,10 @@ async function runJudgeLikeNode(
   node: "casper" | "judge",
   system: string,
   originalPrompt: string,
-  answer: string
+  answer: string,
+  geminiModel?: GeminiModel
 ): Promise<JudgeResult> {
-  const plan = getModelPlan(mode, node);
+  const plan = getModelPlan(mode, node, geminiModel);
   const result = await generateText({
     ...plan,
     system,

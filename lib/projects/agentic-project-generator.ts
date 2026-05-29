@@ -2,6 +2,7 @@ import { getModelPlan } from "@/lib/magi/model-plan";
 import { generateText } from "@/lib/magi/providers";
 import { buildMcpContext, projectSkillPaths } from "@/lib/magi/runtime-context";
 import { loadSkillPacks } from "@/lib/magi/skill-loader";
+import { queryMagicUiInspiration } from "@/lib/mcp/client";
 import { generateWebsiteProject, type GeneratedFile, type GeneratedProject } from "./website-generator";
 
 type ProjectManifest = {
@@ -12,9 +13,10 @@ type ProjectManifest = {
 
 export async function generateAgenticWebsiteProject(prompt: string): Promise<GeneratedProject> {
   try {
-    const [skillContext, mcp] = await Promise.all([
+    const [skillContext, mcp, magicUiContext] = await Promise.all([
       loadSkillPacks(projectSkillPaths),
       buildMcpContext(),
+      queryMagicUiInspiration(prompt).catch(() => null),
     ]);
     const plan = getModelPlan("standard", "balthasar");
     const response = await generateText({
@@ -40,6 +42,9 @@ export async function generateAgenticWebsiteProject(prompt: string): Promise<Gen
         skillContext,
         "",
         mcp.context,
+        "",
+        "Website/UI MCP tool execution context:",
+        magicUiContext || "No 21st.dev Magic bridge tool output was available for this generation.",
       ].join("\n"),
       prompt: `Build a downloadable website project for this request:\n${prompt}`,
       maxTokens: 5000,

@@ -70,6 +70,7 @@ function createId() {
 export default function Home() {
   const [prompt, setPrompt] = useState("");
   const [mode, setMode] = useState<"economy" | "standard" | "premium">("standard");
+  const [geminiModel, setGeminiModel] = useState("gemini-2.5-flash");
   const [messages, setMessages] = useState<Message[]>([]);
   const [steps, setSteps] = useState<Record<PipelineStep, StepState>>(initialSteps);
   const [nodeOutputs, setNodeOutputs] = useState<NodeOutput[]>([]);
@@ -132,7 +133,7 @@ export default function Home() {
       const response = await fetch("/api/magi", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: trimmed, mode }),
+        body: JSON.stringify({ prompt: trimmed, mode, geminiModel }),
         signal: controller.signal,
       });
 
@@ -346,6 +347,21 @@ export default function Home() {
             <option value="economy">Economy</option>
             <option value="standard">Standard</option>
             <option value="premium">Premium</option>
+          </select>
+          <label className="sr-only" htmlFor="geminiModelSelect">
+            Gemini model
+          </label>
+          <select
+            id="geminiModelSelect"
+            value={geminiModel}
+            onChange={(event) => setGeminiModel(event.target.value)}
+            disabled={isRunning}
+          >
+            <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+            <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+            <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+            <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+            <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
           </select>
           <label className="sr-only" htmlFor="promptInput">
             Prompt

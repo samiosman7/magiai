@@ -1,11 +1,18 @@
 import { checkCreditAccess } from "@/lib/billing/credits";
 import { runMagiPipeline } from "@/lib/magi/pipeline";
-import type { MagiEvent, MagiMode } from "@/lib/magi/types";
+import type { GeminiModel, MagiEvent, MagiMode } from "@/lib/magi/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const validModes = new Set(["economy", "standard", "premium"]);
+const validGeminiModels = new Set([
+  "gemini-2.5-flash",
+  "gemini-2.5-pro",
+  "gemini-2.0-flash",
+  "gemini-1.5-flash",
+  "gemini-1.5-pro",
+]);
 
 export async function POST(request: Request) {
   const userId = "local-test-user";
@@ -13,10 +20,14 @@ export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as {
     prompt?: unknown;
     mode?: unknown;
+    geminiModel?: unknown;
   } | null;
 
   const prompt = typeof body?.prompt === "string" ? body.prompt.trim() : "";
   const mode = validModes.has(String(body?.mode)) ? (body?.mode as MagiMode) : "standard";
+  const geminiModel = validGeminiModels.has(String(body?.geminiModel))
+    ? (body?.geminiModel as GeminiModel)
+    : undefined;
 
   if (!prompt) {
     return Response.json({ error: "Prompt is required." }, { status: 400 });
@@ -50,7 +61,7 @@ export async function POST(request: Request) {
           name: "Credit gate",
           text: `${creditCheck.creditsRequired} credits authorized for ${mode} mode.`,
         });
-        await runMagiPipeline(prompt, mode, emit);
+        await runMagiPipeline(prompt, mode, emit, geminiModel);
       } catch (error) {
         emit({
           type: "error",
