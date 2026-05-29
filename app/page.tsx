@@ -357,10 +357,25 @@ export default function Home() {
             onChange={(event) => setGeminiModel(event.target.value)}
             disabled={isRunning}
           >
-            <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+            <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro Preview</option>
+            <option value="gemini-3.1-flash-lite-preview">Gemini 3.1 Flash Lite Preview</option>
+            <option value="gemini-3-pro-preview">Gemini 3 Pro Preview</option>
+            <option value="gemini-3-flash-preview">Gemini 3 Flash Preview</option>
             <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+            <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+            <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</option>
+            <option value="gemini-2.5-flash-lite-preview-06-17">
+              Gemini 2.5 Flash Lite Preview 06-17
+            </option>
+            <option value="gemini-2.5-flash-lite-preview-09-2025">
+              Gemini 2.5 Flash Lite Preview 09-2025
+            </option>
+            <option value="gemini-2.0-flash-001">Gemini 2.0 Flash 001</option>
             <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+            <option value="gemini-2.0-flash-lite">Gemini 2.0 Flash Lite</option>
+            <option value="gemini-2.0-flash-lite-001">Gemini 2.0 Flash Lite 001</option>
             <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+            <option value="gemini-1.5-flash-8b">Gemini 1.5 Flash 8B</option>
             <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
           </select>
           <label className="sr-only" htmlFor="promptInput">
