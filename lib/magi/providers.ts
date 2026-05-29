@@ -91,12 +91,15 @@ async function google(call: ModelCall): Promise<ModelResult> {
   if (keys.length === 0) return mockGenerate(call);
 
   let lastError: Error | null = null;
+  const models = googleModelFallbacks(call.model);
 
   for (const apiKey of keys) {
-    try {
-      return await googleWithKey(call, apiKey);
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error("google call failed");
+    for (const model of models) {
+      try {
+        return await googleWithKey({ ...call, model }, apiKey);
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error("google call failed");
+      }
     }
   }
 
@@ -147,6 +150,17 @@ async function googleWithKey(call: ModelCall, apiKey: string): Promise<ModelResu
   }
 
   return { text, provider: call.provider, model: call.model, isMock: false };
+}
+
+function googleModelFallbacks(model: string) {
+  const fallbacks = [
+    model,
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+    "gemini-1.5-flash",
+  ];
+
+  return [...new Set(fallbacks)];
 }
 
 function mockGenerate(call: ModelCall): ModelResult {
