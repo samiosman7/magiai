@@ -150,24 +150,45 @@ function assertMatchesPrompt(project: GeneratedProject, prompt: string) {
   const lowerPrompt = prompt.toLowerCase();
   const combined = project.files.map((file) => file.content).join("\n").toLowerCase();
 
-  if (/\b(bakery|baker|pastry|pastries|cake|cakes|bread|sourdough)\b/.test(lowerPrompt)) {
-    const bakeryTerms = [
-      "bakery",
-      "bread",
-      "sourdough",
-      "pastry",
-      "pastries",
-      "croissant",
-      "cake",
-      "menu",
-      "pickup",
-      "catering",
-      "oven",
-    ];
-    const hits = bakeryTerms.filter((term) => combined.includes(term)).length;
+  const rules = [
+    {
+      promptPattern: /\b(bakery|baker|pastry|pastries|cake|cakes|bread|sourdough)\b/,
+      label: "bakery",
+      terms: ["bakery", "bread", "sourdough", "pastry", "pastries", "croissant", "cake", "menu", "pickup", "catering", "oven"],
+      minimum: 5,
+    },
+    {
+      promptPattern: /\b(detailing|detailer|car wash|auto detail|vehicle|ceramic|paint correction)\b/,
+      label: "detailing",
+      terms: ["detailing", "vehicle", "wash", "interior", "exterior", "paint", "ceramic", "wheels", "appointment", "mobile"],
+      minimum: 5,
+    },
+    {
+      promptPattern: /\b(restaurant|dining|bistro|cafe|bar|reservation|menu|chef)\b/,
+      label: "restaurant",
+      terms: ["restaurant", "menu", "dining", "reservation", "chef", "table", "dish", "bar", "hours", "private"],
+      minimum: 5,
+    },
+    {
+      promptPattern: /\b(portfolio|designer|photographer|artist|copywriter|creative|case study|case studies)\b/,
+      label: "portfolio",
+      terms: ["portfolio", "work", "project", "case", "client", "services", "creative", "brief", "selected", "contact"],
+      minimum: 5,
+    },
+    {
+      promptPattern: /\b(saas|software|startup|app|platform|dashboard|api|demo|workflow)\b/,
+      label: "software product",
+      terms: ["product", "software", "workflow", "demo", "dashboard", "integration", "team", "feature", "metric", "security"],
+      minimum: 5,
+    },
+  ];
 
-    if (hits < 5) {
-      throw new Error("Generated bakery site was not specific enough to the prompt.");
+  for (const rule of rules) {
+    if (!rule.promptPattern.test(lowerPrompt)) continue;
+    const hits = rule.terms.filter((term) => combined.includes(term)).length;
+
+    if (hits < rule.minimum) {
+      throw new Error(`Generated ${rule.label} site was not specific enough to the prompt.`);
     }
   }
 }
