@@ -1,5 +1,6 @@
 import { getModelPlan } from "./model-plan";
 import { generateText } from "./providers";
+import { buildMagiRuntimeContext } from "./runtime-context";
 import { skillLabels, skillPackPaths, skillPrompt } from "./skills";
 import type { DifficultyResult, JudgeResult, MagiEvent, MagiMode, PipelineStep } from "./types";
 
@@ -12,13 +13,28 @@ const productContext =
 export async function runMagiPipeline(prompt: string, mode: MagiMode, emit: Emit) {
   activate("scan", emit);
   emit({ type: "status", step: "scan", message: "Difficulty scan running..." });
-  await wait(120);
-  const difficulty = scanDifficulty(prompt);
+  const [difficulty, runtimeContext] = await Promise.all([
+    Promise.resolve(scanDifficulty(prompt)),
+    buildMagiRuntimeContext(prompt),
+    wait(120),
+  ]).then(([result, context]) => [result, context] as const);
   emit({
     type: "node",
     name: "Difficulty scan",
     text: `${difficulty.complex ? "Complex" : "Simple"} prompt. Score ${difficulty.score}. ${difficulty.reason}`,
   });
+  emit({
+    type: "node",
+    name: "Runtime context",
+    text: `Loaded ${Object.keys(runtimeContext.nodeSkillContext).length} node skill packs and ${runtimeContext.configuredMcpCount} configured MCP server(s). ${runtimeContext.connectedMcpCount} MCP server(s) connected for this run.`,
+  });
+  if (runtimeContext.mcpToolContext.startsWith("Executed MCP tool:")) {
+    emit({
+      type: "node",
+      name: "MCP tool use",
+      text: preview(runtimeContext.mcpToolContext, 360),
+    });
+  }
   complete("scan", emit);
 
   if (!difficulty.complex) {
@@ -41,7 +57,7 @@ export async function runMagiPipeline(prompt: string, mode: MagiMode, emit: Emit
   const melchiorPlan = getModelPlan(mode, "melchior");
   const melchior = await generateText({
     ...melchiorPlan,
-    system: `${productContext}\n\nYou are Melchior, the correction and gap-filling node. Repair missing steps, identify assumptions, preserve the user's goal, and return a concise repaired draft.\n\n${skillPrompt("melchior")}`,
+    system: `${productContext}\n\nYou are Melchior, the correction and gap-filling node. Repair missing steps, identify assumptions, preserve the user's goal, and return a concise repaired draft.\n\n${skillPrompt("melchior")}\n\nFull Melchior SKILL.md:\n${runtimeContext.nodeSkillContext.melchior}\n\n${runtimeContext.mcpContext}\n\nMCP tool execution context:\n${runtimeContext.mcpToolContext}`,
     prompt,
     maxTokens: 900,
   });
@@ -59,7 +75,7 @@ export async function runMagiPipeline(prompt: string, mode: MagiMode, emit: Emit
   const balthasarPlan = getModelPlan(mode, "balthasar");
   const balthasar = await generateText({
     ...balthasarPlan,
-    system: `${productContext}\n\nYou are Balthasar, the builder and hardener. Turn the repaired draft into a concrete, polished, directly usable answer. Do not mention internal deliberation.\n\n${skillPrompt("balthasar")}`,
+    system: `${productContext}\n\nYou are Balthasar, the builder and hardener. Turn the repaired draft into a concrete, polished, directly usable answer. Do not mention internal deliberation.\n\n${skillPrompt("balthasar")}\n\nFull Balthasar SKILL.md:\n${runtimeContext.nodeSkillContext.balthasar}\n\nProject and cross-functional skill packs:\n${runtimeContext.projectSkillContext}\n\n${runtimeContext.mcpContext}\n\nMCP tool execution context:\n${runtimeContext.mcpToolContext}`,
     prompt: `Original prompt:\n${prompt}\n\nMelchior repaired draft:\n${melchior.text}`,
     maxTokens: 1200,
   });
@@ -87,14 +103,14 @@ export async function runMagiPipeline(prompt: string, mode: MagiMode, emit: Emit
     runJudgeLikeNode(
       mode,
       "casper",
-      `${productContext}\n\nYou are Casper, the intent-preservation and dramatic-change monitor. Return strict JSON with passed, issue, and rationale. Flag only if the answer drifts from the original request.\n\n${skillPrompt("casper")}`,
+      `${productContext}\n\nYou are Casper, the intent-preservation and dramatic-change monitor. Return strict JSON with passed, issue, and rationale. Flag only if the answer drifts from the original request.\n\n${skillPrompt("casper")}\n\nFull Casper SKILL.md:\n${runtimeContext.nodeSkillContext.casper}\n\n${runtimeContext.mcpContext}\n\nMCP tool execution context:\n${runtimeContext.mcpToolContext}`,
       prompt,
       balthasar.text
     ),
     runJudgeLikeNode(
       mode,
       "judge",
-      `${productContext}\n\nYou are a fresh, independent correctness judge. Return strict JSON with passed, issue, and rationale. Flag only blocking factual, logic, or instruction-following problems.\n\n${skillPrompt("judge")}`,
+      `${productContext}\n\nYou are a fresh, independent correctness judge. Return strict JSON with passed, issue, and rationale. Flag only blocking factual, logic, or instruction-following problems.\n\n${skillPrompt("judge")}\n\nFull Fact Judge SKILL.md:\n${runtimeContext.nodeSkillContext.judge}\n\n${runtimeContext.mcpContext}\n\nMCP tool execution context:\n${runtimeContext.mcpToolContext}`,
       prompt,
       balthasar.text
     ),
@@ -125,7 +141,7 @@ export async function runMagiPipeline(prompt: string, mode: MagiMode, emit: Emit
     activate("balthasar", emit);
     const revision = await generateText({
       ...balthasarPlan,
-      system: `${productContext}\n\nYou are Melchior and Balthasar in a correction loop. Fix the shared objection while preserving the user's intent. Return only the revised final answer.\n\n${skillPrompt("melchior")}\n\n${skillPrompt("balthasar")}`,
+      system: `${productContext}\n\nYou are Melchior and Balthasar in a correction loop. Fix the shared objection while preserving the user's intent. Return only the revised final answer.\n\n${skillPrompt("melchior")}\n\n${runtimeContext.nodeSkillContext.melchior}\n\n${skillPrompt("balthasar")}\n\n${runtimeContext.nodeSkillContext.balthasar}\n\n${runtimeContext.projectSkillContext}\n\n${runtimeContext.mcpContext}\n\nMCP tool execution context:\n${runtimeContext.mcpToolContext}`,
       prompt: `Original prompt:\n${prompt}\n\nPrevious answer:\n${balthasar.text}\n\nShared objection:\n${sharedIssue}`,
       maxTokens: 1300,
     });

@@ -1,9 +1,7 @@
 import { getModelPlan } from "@/lib/magi/model-plan";
 import { generateText } from "@/lib/magi/providers";
-import { skillPackPaths } from "@/lib/magi/skills";
+import { buildMcpContext, projectSkillPaths } from "@/lib/magi/runtime-context";
 import { loadSkillPacks } from "@/lib/magi/skill-loader";
-import { getMcpServerStatuses } from "@/lib/mcp/client";
-import { mcpCatalog } from "@/lib/mcp/catalog";
 import { generateWebsiteProject, type GeneratedFile, type GeneratedProject } from "./website-generator";
 
 type ProjectManifest = {
@@ -12,20 +10,9 @@ type ProjectManifest = {
   files?: GeneratedFile[];
 };
 
-const projectSkillPaths = [
-  skillPackPaths.melchior,
-  skillPackPaths.balthasar,
-  skillPackPaths.casper,
-  skillPackPaths.judge,
-  "magi-skills/ui-ux-product-design/SKILL.md",
-  "magi-skills/agentic-project-builder/SKILL.md",
-  "magi-skills/mcp-tool-orchestration/SKILL.md",
-  "magi-skills/product-strategy-growth/SKILL.md",
-];
-
 export async function generateAgenticWebsiteProject(prompt: string): Promise<GeneratedProject> {
   try {
-    const [skillContext, mcpContext] = await Promise.all([
+    const [skillContext, mcp] = await Promise.all([
       loadSkillPacks(projectSkillPaths),
       buildMcpContext(),
     ]);
@@ -52,7 +39,7 @@ export async function generateAgenticWebsiteProject(prompt: string): Promise<Gen
         "",
         skillContext,
         "",
-        mcpContext,
+        mcp.context,
       ].join("\n"),
       prompt: `Build a downloadable website project for this request:\n${prompt}`,
       maxTokens: 5000,
@@ -64,32 +51,6 @@ export async function generateAgenticWebsiteProject(prompt: string): Promise<Gen
   } catch {
     return generateWebsiteProject(prompt);
   }
-}
-
-async function buildMcpContext() {
-  const statuses = await getMcpServerStatuses().catch(() => []);
-  const configured = statuses
-    .map((server) => ({
-      name: server.name,
-      connected: server.connected,
-      tools: server.tools.map((tool) => tool.name),
-    }))
-    .slice(0, 12);
-
-  return JSON.stringify(
-    {
-      configuredMcpServers: configured,
-      recommendedMcpCatalog: mcpCatalog.map((entry) => ({
-        id: entry.id,
-        name: entry.name,
-        category: entry.category,
-        transport: entry.transport,
-        productionReadyOnVercel: entry.productionReadyOnVercel,
-      })),
-    },
-    null,
-    2
-  );
 }
 
 function parseProjectManifest(text: string): ProjectManifest {
