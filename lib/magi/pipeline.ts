@@ -175,7 +175,19 @@ function complete(step: PipelineStep, emit: Emit) {
 function scanDifficulty(prompt: string): DifficultyResult {
   const words = prompt.trim().split(/\s+/).filter(Boolean).length;
   const lower = prompt.toLowerCase();
+  if (
+    /\b(build|create|make|generate|design)\b/.test(lower) &&
+    /\b(website|site|landing page|web page|homepage|portfolio|ui|component)\b/.test(lower)
+  ) {
+    return {
+      complex: true,
+      score: Math.max(24, words + 16),
+      reason: "Website/UI generation request. Ensemble activated.",
+    };
+  }
+
   const terms = [
+    "create",
     "review",
     "build",
     "debug",
@@ -189,6 +201,10 @@ function scanDifficulty(prompt: string): DifficultyResult {
     "risk",
     "code",
     "latest",
+    "website",
+    "landing page",
+    "component",
+    "ui",
   ];
   const hits = terms.filter((term) => lower.includes(term)).length;
   const score = words + hits * 8 + (prompt.match(/[?.,;:]/g) || []).length;

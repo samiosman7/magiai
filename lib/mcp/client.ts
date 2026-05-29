@@ -94,8 +94,8 @@ export async function queryMagicUiInspiration(prompt: string): Promise<string | 
   });
 
   try {
-    await client.connect(transport, { timeout: 20_000 });
-    const tools = await client.listTools(undefined, { timeout: 20_000 });
+    await client.connect(transport, { timeout: 120_000 });
+    const tools = await client.listTools(undefined, { timeout: 120_000 });
     const hasInspirationTool = tools.tools?.some(
       (tool) => tool.name === "21st_magic_component_inspiration"
     );
@@ -110,7 +110,7 @@ export async function queryMagicUiInspiration(prompt: string): Promise<string | 
         },
       },
       undefined,
-      { timeout: 60_000 }
+      { timeout: 120_000 }
     );
 
     const text = extractText(result.content).slice(0, 6000);
@@ -146,8 +146,9 @@ async function readMcpServerStatus(config: McpServerConfig): Promise<McpServerSt
   });
 
   try {
-    await client.connect(transport, { timeout: 12_000 });
-    const response = await client.listTools(undefined, { timeout: 12_000 });
+    const timeout = isMagicServer(config) ? 120_000 : 12_000;
+    await client.connect(transport, { timeout });
+    const response = await client.listTools(undefined, { timeout });
     await client.close();
 
     return {
@@ -194,6 +195,10 @@ function inferLibraryName(prompt: string) {
   ];
 
   return candidates.find(([pattern]) => pattern.test(lower))?.[1] ?? null;
+}
+
+function isMagicServer(config: McpServerConfig) {
+  return /(21st|magic)/i.test(config.name) && !config.url.includes("context7");
 }
 
 function isUiPrompt(prompt: string) {
