@@ -307,9 +307,8 @@ export default function Home() {
               </div>
               <h2>Three AIs. One answer. No blind spots.</h2>
               <p>
-                Choose a MAGI mode, enter a directive, and the server will route the
-                request through the orchestration pipeline. Local demos run in mock
-                mode until provider keys are added.
+                Choose a mode, enter a directive, and MAGI will route the request
+                through correction, hardening, intent review, and final judgment.
               </p>
             </div>
           )}
