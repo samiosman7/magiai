@@ -202,6 +202,8 @@ function inferOffer(lower: string) {
 }
 
 function html(profile: SiteProfile) {
+  if (profile.category === "neighborhood bakery") return bakeryHtml(profile);
+
   return `<!doctype html>
 <html lang="en">
   <head>
@@ -303,7 +305,7 @@ function html(profile: SiteProfile) {
         </div>
         <div class="proof-stack">
           <blockquote>
-            “The site made the offer obvious and the booking path impossible to miss.”
+            "The site made the offer obvious and the booking path impossible to miss."
           </blockquote>
           <div class="metric-row">
             <div><strong>4.9</strong><span>review average</span></div>
@@ -358,6 +360,202 @@ function html(profile: SiteProfile) {
           <label>
             Request
             <textarea name="message" placeholder="Tell us what you need"></textarea>
+          </label>
+          <button type="button">${escapeHtml(profile.primaryCta)}</button>
+        </form>
+      </section>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>
+`;
+}
+
+function bakeryHtml(profile: SiteProfile) {
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${escapeHtml(profile.title)}</title>
+    <meta
+      name="description"
+      content="${escapeHtml(profile.title)} bakes sourdough, pastries, cakes, and preorder boxes for local pickup."
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="nav">
+      <a class="brand" href="#top">${escapeHtml(profile.title)}</a>
+      <nav>
+        <a href="#menu">Menu</a>
+        <a href="#today">Today</a>
+        <a href="#cakes">Cakes</a>
+        <a href="#visit">Visit</a>
+      </nav>
+    </header>
+
+    <main id="top">
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Neighborhood bakery</p>
+          <h1>${escapeHtml(profile.headline)}</h1>
+          <p class="lede">Small-batch sourdough, laminated pastries, custom cakes, and preorder boxes baked for breakfast runs, office treats, and weekend celebrations.</p>
+          <div class="actions">
+            <a class="button" href="#visit">${escapeHtml(profile.primaryCta)}</a>
+            <a class="button secondary" href="#menu">${escapeHtml(profile.secondaryCta)}</a>
+          </div>
+        </div>
+        <aside class="hero-panel" aria-label="Today from the oven">
+          <span class="panel-label">Today from the oven</span>
+          <strong>7am sourdough</strong>
+          <p>Butter croissants at 8, focaccia by 10, and celebration cake pickups after noon.</p>
+        </aside>
+      </section>
+
+      <section class="section intro" id="today">
+        <p class="section-kicker">Fresh today</p>
+        <h2>Baked for morning routines, shared tables, and last-minute office wins.</h2>
+        <div class="intro-grid">
+          <article>
+            <span>01</span>
+            <h3>Daily bread</h3>
+            <p>Country sourdough, seeded rye, and focaccia come out in small batches so the crust stays crisp.</p>
+          </article>
+          <article>
+            <span>02</span>
+            <h3>Pastry case</h3>
+            <p>Croissants, morning buns, lemon tarts, and seasonal danishes are rotated around ripe fruit and real butter.</p>
+          </article>
+          <article>
+            <span>03</span>
+            <h3>Preorders</h3>
+            <p>Reserve pastry boxes, birthday cakes, and catering trays before the morning rush sells through.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section packages" id="menu">
+        <div>
+          <p class="section-kicker">Menu</p>
+          <h2>Choose the thing people will ask about later.</h2>
+        </div>
+        <div class="cards">
+          <article class="card">
+            <p class="tag">Bread</p>
+            <h3>Country sourdough</h3>
+            <p>Long-fermented loaf with a caramelized crust, open crumb, and enough tang for soup, toast, or sandwiches.</p>
+            <strong>$9 loaf</strong>
+          </article>
+          <article class="card featured">
+            <p class="tag">Most requested</p>
+            <h3>Butter croissant box</h3>
+            <p>Six flaky croissants packed warm for meetings, brunches, or the person who always says they only want one bite.</p>
+            <strong>$24 box</strong>
+          </article>
+          <article class="card">
+            <p class="tag">Sweet</p>
+            <h3>Lemon cream tart</h3>
+            <p>Bright citrus curd, toasted meringue, and a crisp shell sized for a clean finish after coffee.</p>
+            <strong>$6 each</strong>
+          </article>
+        </div>
+      </section>
+
+      <section class="section proof" id="proof">
+        <div class="proof-copy">
+          <p class="section-kicker">Local proof</p>
+          <h2>The almond croissants sell out before lunch for a reason.</h2>
+          <p>
+            Add real bakery photography here: steam rising from the first bread cut,
+            a full pastry case, custom cake details, and customers picking up weekend boxes.
+          </p>
+        </div>
+        <div class="proof-stack">
+          <blockquote>
+            "The birthday cake looked beautiful, tasted even better, and pickup took less than two minutes."
+          </blockquote>
+          <div class="metric-row">
+            <div><strong>7am</strong><span>first bread batch</span></div>
+            <div><strong>48h</strong><span>cake preorder window</span></div>
+            <div><strong>6-pack</strong><span>office pastry boxes</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section packages" id="cakes">
+        <div>
+          <p class="section-kicker">Cakes & catering</p>
+          <h2>Celebrations should taste as intentional as they look.</h2>
+        </div>
+        <div class="cards">
+          <article class="card">
+            <p class="tag">Birthdays</p>
+            <h3>Layer cakes</h3>
+            <p>Vanilla bean, chocolate malt, carrot cake, or seasonal fruit with simple floral finishing.</p>
+            <strong>From $58</strong>
+          </article>
+          <article class="card">
+            <p class="tag">Teams</p>
+            <h3>Office breakfast tray</h3>
+            <p>Croissants, muffins, sliced loaf cake, jam, and enough variety for mixed tastes.</p>
+            <strong>From $72</strong>
+          </article>
+          <article class="card">
+            <p class="tag">Weekend</p>
+            <h3>Brunch preorder box</h3>
+            <p>A ready-to-share box with pastries, sourdough, compound butter, and a rotating seasonal sweet.</p>
+            <strong>$44 box</strong>
+          </article>
+        </div>
+      </section>
+
+      <section class="section process" id="process">
+        <p class="section-kicker">How pickup works</p>
+        <h2>Reserve before it sells out, then skip the line.</h2>
+        <ol>
+          <li><strong>Pick your bake.</strong><span>Choose bread, pastries, cake, or catering from the menu.</span></li>
+          <li><strong>Choose a pickup window.</strong><span>Morning pastry boxes and afternoon cake pickups are packed separately.</span></li>
+          <li><strong>Arrive warm.</strong><span>Your order is labeled, boxed, and ready at the counter.</span></li>
+        </ol>
+      </section>
+
+      <section class="section faq">
+        <p class="section-kicker">FAQ</p>
+        <div class="faq-grid">
+          <details open>
+            <summary>How far ahead should I order a cake?</summary>
+            <p>Two days is ideal for standard cakes. Larger catering orders should be requested at least five days ahead.</p>
+          </details>
+          <details>
+            <summary>Do you sell out?</summary>
+            <p>Yes. Bread and croissants are baked in small batches, so preordering is the safest way to get exactly what you want.</p>
+          </details>
+          <details>
+            <summary>Can I order for an office or event?</summary>
+            <p>Yes. Pastry trays, sliced loaf cakes, and breakfast boxes can be packed for groups with clear pickup labels.</p>
+          </details>
+        </div>
+      </section>
+
+      <section class="section contact" id="visit">
+        <div>
+          <p class="section-kicker">Visit & preorder</p>
+          <h2>Tell us what to save before the case empties.</h2>
+        </div>
+        <form>
+          <label>
+            Name
+            <input name="name" placeholder="Your name" />
+          </label>
+          <label>
+            Email
+            <input name="email" placeholder="you@example.com" type="email" />
+          </label>
+          <label>
+            Order details
+            <textarea name="message" placeholder="Example: 1 sourdough loaf, 1 croissant box, pickup Saturday at 9am"></textarea>
           </label>
           <button type="button">${escapeHtml(profile.primaryCta)}</button>
         </form>

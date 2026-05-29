@@ -64,6 +64,7 @@ export async function generateAgenticWebsiteProject(
     const parsed = await parseOrRepairProjectManifest(response.text, prompt, system, plan);
     const project = sanitizeProject(parsed, prompt);
     assertNotGenericTemplate(project);
+    assertMatchesPrompt(project, prompt);
     return project;
   } catch {
     return generateWebsiteProject(prompt);
@@ -142,6 +143,32 @@ function assertNotGenericTemplate(project: GeneratedProject) {
 
   if (blocked.some((phrase) => combined.includes(phrase))) {
     throw new Error("Generic website template leaked into generated output.");
+  }
+}
+
+function assertMatchesPrompt(project: GeneratedProject, prompt: string) {
+  const lowerPrompt = prompt.toLowerCase();
+  const combined = project.files.map((file) => file.content).join("\n").toLowerCase();
+
+  if (/\b(bakery|baker|pastry|pastries|cake|cakes|bread|sourdough)\b/.test(lowerPrompt)) {
+    const bakeryTerms = [
+      "bakery",
+      "bread",
+      "sourdough",
+      "pastry",
+      "pastries",
+      "croissant",
+      "cake",
+      "menu",
+      "pickup",
+      "catering",
+      "oven",
+    ];
+    const hits = bakeryTerms.filter((term) => combined.includes(term)).length;
+
+    if (hits < 5) {
+      throw new Error("Generated bakery site was not specific enough to the prompt.");
+    }
   }
 }
 
