@@ -61,6 +61,15 @@ type MagiArtifact = {
   actions: Array<{ label: string; action: "download_website" | "save_planned" }>;
 };
 
+type WorkspaceRun = {
+  id: string;
+  prompt: string;
+  taskLabel: string;
+  artifactType: string;
+  finalAnswer: string;
+  createdAt: string;
+};
+
 type MagiEvent =
   | { type: "status"; step: PipelineStep; message: string }
   | { type: "node"; name: string; text: string }
@@ -99,10 +108,12 @@ export default function Home() {
   const [skillOutputs, setSkillOutputs] = useState<SkillOutput[]>([]);
   const [taskProfile, setTaskProfile] = useState<TaskProfile | null>(null);
   const [artifacts, setArtifacts] = useState<MagiArtifact[]>([]);
+  const [workspaceRuns, setWorkspaceRuns] = useState<WorkspaceRun[]>([]);
   const [mcpServers, setMcpServers] = useState<McpServerStatus[]>([]);
   const [mcpCatalog, setMcpCatalog] = useState<McpCatalogEntry[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const currentPromptRef = useRef("");
 
   const hasMessages = messages.length > 0;
 
@@ -138,6 +149,21 @@ export default function Home() {
     };
   }, []);
 
+  useEffect(() => {
+    const stored = window.localStorage.getItem("magi.workspaceRuns");
+    if (!stored) return;
+
+    try {
+      setWorkspaceRuns(JSON.parse(stored) as WorkspaceRun[]);
+    } catch {
+      setWorkspaceRuns([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem("magi.workspaceRuns", JSON.stringify(workspaceRuns.slice(0, 20)));
+  }, [workspaceRuns]);
+
   async function submitPrompt(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const trimmed = prompt.trim();
@@ -148,6 +174,7 @@ export default function Home() {
     abortRef.current = controller;
     setIsRunning(true);
     setPrompt("");
+    currentPromptRef.current = trimmed;
     setMessages((current) => [...current, { id: createId(), kind: "user", text: trimmed }]);
     setSteps(initialSteps);
     setNodeOutputs([]);
@@ -244,6 +271,21 @@ export default function Home() {
     }
 
     if (event.type === "final") {
+      const sourcePrompt = currentPromptRef.current;
+      const currentArtifact = artifacts[artifacts.length - 1];
+      if (sourcePrompt) {
+        setWorkspaceRuns((current) => [
+          {
+            id: createId(),
+            prompt: sourcePrompt,
+            taskLabel: taskProfile?.label ?? "MAGI task",
+            artifactType: currentArtifact?.type ?? taskProfile?.artifactType ?? "answer",
+            finalAnswer: event.answer,
+            createdAt: new Date().toISOString(),
+          },
+          ...current,
+        ].slice(0, 20));
+      }
       setMessages((current) => [
         ...current,
         {
@@ -306,6 +348,59 @@ export default function Home() {
     const link = document.createElement("a");
     link.href = url;
     link.download = "magi-site.zip";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  async function downloadArtifact(artifact: MagiArtifact) {
+    const sourcePrompt =
+      currentPromptRef.current || [...messages].reverse().find((message) => message.kind === "user")?.text;
+    if (!sourcePrompt) return;
+
+    if (artifact.actions.some((action) => action.action === "download_website")) {
+      await downloadProject(sourcePrompt);
+      return;
+    }
+
+    setMessages((current) => [
+      ...current,
+      {
+        id: createId(),
+        kind: "status",
+        text: `Universal artifact builder is generating ${artifact.type} files...`,
+      },
+    ]);
+
+    const response = await fetch("/api/artifacts/download", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt: sourcePrompt,
+        mode,
+        geminiModel,
+        artifactType: artifact.type,
+      }),
+    });
+
+    if (!response.ok) {
+      setMessages((current) => [
+        ...current,
+        {
+          id: createId(),
+          kind: "status",
+          text: "Artifact download failed. Check provider configuration and try again.",
+        },
+      ]);
+      return;
+    }
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${artifact.type}-artifact.zip`;
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -486,19 +581,14 @@ export default function Home() {
                   <code>{artifact.type} | {artifact.status}</code>
                   <p>{artifact.summary}</p>
                   {artifact.actions.map((action) =>
-                    action.action === "download_website" ? (
+                    action.action === "download_website" || action.action === "save_planned" ? (
                       <button
                         className="artifact-action"
                         key={action.label}
                         type="button"
-                        onClick={() => {
-                          const sourcePrompt = [...messages]
-                            .reverse()
-                            .find((message) => message.kind === "user")?.text;
-                          if (sourcePrompt) downloadProject(sourcePrompt);
-                        }}
+                        onClick={() => downloadArtifact(artifact)}
                       >
-                        {action.label}
+                        {action.action === "save_planned" ? "Download ZIP" : action.label}
                       </button>
                     ) : (
                       <span className="artifact-pill" key={action.label}>
@@ -523,6 +613,33 @@ export default function Home() {
                   <strong>{output.name}</strong>
                   <span>{output.text}</span>
                 </div>
+              ))
+            )}
+          </div>
+        </details>
+
+        <details className="node-card">
+          <summary>Workspace history</summary>
+          <div className="history-log">
+            {workspaceRuns.length === 0 ? (
+              <p>No saved local runs yet.</p>
+            ) : (
+              workspaceRuns.map((run) => (
+                <button
+                  className="history-output"
+                  key={run.id}
+                  type="button"
+                  onClick={() => {
+                    setMessages([
+                      { id: createId(), kind: "user", text: run.prompt },
+                      { id: createId(), kind: "magi", text: run.finalAnswer },
+                    ]);
+                  }}
+                >
+                  <strong>{run.taskLabel}</strong>
+                  <span>{run.artifactType}</span>
+                  <small>{new Date(run.createdAt).toLocaleString()}</small>
+                </button>
               ))
             )}
           </div>

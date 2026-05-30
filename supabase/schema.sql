@@ -28,12 +28,33 @@ create table if not exists public.magi_runs (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.magi_artifacts (
+  id uuid primary key default gen_random_uuid(),
+  run_id uuid references public.magi_runs(id) on delete cascade,
+  clerk_user_id text not null references public.magi_profiles(clerk_user_id) on delete cascade,
+  artifact_type text not null,
+  title text not null,
+  status text not null default 'planned',
+  summary text,
+  files jsonb not null default '[]'::jsonb,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 alter table public.magi_profiles enable row level security;
 alter table public.magi_credit_events enable row level security;
 alter table public.magi_runs enable row level security;
+alter table public.magi_artifacts enable row level security;
 
 create index if not exists magi_credit_events_user_created_idx
   on public.magi_credit_events(clerk_user_id, created_at desc);
 
 create index if not exists magi_runs_user_created_idx
   on public.magi_runs(clerk_user_id, created_at desc);
+
+create index if not exists magi_artifacts_user_created_idx
+  on public.magi_artifacts(clerk_user_id, created_at desc);
+
+create index if not exists magi_artifacts_run_idx
+  on public.magi_artifacts(run_id);

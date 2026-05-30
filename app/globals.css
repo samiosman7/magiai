@@ -553,7 +553,8 @@ select:disabled {
 .node-log,
 .skill-log,
 .mcp-log,
-.artifact-log {
+.artifact-log,
+.history-log {
   display: grid;
   gap: 10px;
   margin-top: 12px;
@@ -641,6 +642,42 @@ select:disabled {
   padding: 6px 8px;
   border: 1px solid rgba(115, 199, 255, 0.42);
   color: var(--blue);
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.history-output {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 11px;
+  border: 0;
+  border-left: 4px solid var(--green);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--text);
+  text-align: left;
+  text-transform: none;
+}
+
+.history-output strong,
+.history-output span,
+.history-output small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-output strong {
+  color: var(--amber);
+  font-family: Consolas, "Courier New", monospace;
+  text-transform: uppercase;
+}
+
+.history-output span,
+.history-output small {
+  color: var(--muted);
   font-family: Consolas, "Courier New", monospace;
   font-size: 0.72rem;
   text-transform: uppercase;

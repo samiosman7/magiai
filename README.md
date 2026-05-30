@@ -28,6 +28,12 @@ http://localhost:3000
 - Mock mode for local development without paid API calls
 - Credit gate stub before model routing
 - File-based MAGI skill packs in `magi-skills/`
+- Universal task router for coding, research, writing, strategy, data, automation, websites, and general prompts
+- Artifact planning for code, reports, documents, plans, data packages, projects, and direct answers
+- Downloadable universal artifact ZIPs at `/api/artifacts/download`
+- Local workspace history in the UI for recent runs
+- Supabase schema support for persisted artifacts
+- Optional run saving and credit deduction after `/api/magi` completes
 - Agentic website ZIP generation using MAGI skills and MCP context
 
 ## Provider Setup
@@ -50,7 +56,7 @@ MAGI_REQUIRE_BILLING=false
 ```
 
 Leave `MAGI_MOCK_MODE=true` if you want to test the app without calling paid model APIs.
-Leave `MAGI_REQUIRE_BILLING=false` until auth, Stripe, and the credit ledger are connected.
+Leave `MAGI_REQUIRE_BILLING=false` until auth and Stripe checkout are connected. When enabled with Supabase configured, MAGI checks and deducts credits.
 
 For Gemini key rotation, put keys in `.env.local` as one comma-separated line:
 
@@ -62,11 +68,11 @@ Do not commit `.env.local`. If a key is pasted into chat or a public place, rota
 
 ## Next Functional Milestones
 
-- Add Stripe Checkout and webhooks
+- Add Stripe Checkout and webhook credit top-ups
 - Run `supabase/schema.sql` in Supabase SQL editor
 - Add auth and signup webhook to create `magi_profiles` rows
-- Deduct credits and save runs after `/api/magi` completes
-- Store dossiers and provider usage per run
+- Replace `local-test-user` with real Supabase Auth user ids
+- Store generated artifact files in Supabase Storage
 - Add per-user rate limits and monthly spend caps
 
 ## MCP Servers

@@ -7,6 +7,16 @@ export type CreditCheck = {
   reason?: string;
 };
 
+export type RunRecordInput = {
+  clerkUserId: string;
+  mode: MagiMode;
+  prompt: string;
+  finalAnswer?: string;
+  creditsCharged: number;
+  dossier: unknown[];
+  providerUsage?: unknown[];
+};
+
 const creditCostByMode: Record<MagiMode, number> = {
   economy: 0.5,
   standard: 1,
@@ -71,4 +81,59 @@ export async function checkCreditAccess(
   }
 
   return { allowed: true, creditsRequired };
+}
+
+export async function recordRunAndChargeCredits(input: RunRecordInput) {
+  if (!hasSupabaseConfig()) return { saved: false, charged: false };
+
+  const supabase = getSupabaseAdmin();
+  const shouldCharge = process.env.MAGI_REQUIRE_BILLING === "true" && input.creditsCharged > 0;
+
+  if (shouldCharge) {
+    const { data: profile, error: lookupError } = await supabase
+      .from("magi_profiles")
+      .select("credits")
+      .eq("clerk_user_id", input.clerkUserId)
+      .maybeSingle();
+
+    if (lookupError || !profile) {
+      return { saved: false, charged: false, error: lookupError?.message || "Missing profile." };
+    }
+
+    const nextCredits = Math.max(0, Number(profile.credits) - input.creditsCharged);
+    const { error: updateError } = await supabase
+      .from("magi_profiles")
+      .update({ credits: nextCredits, updated_at: new Date().toISOString() })
+      .eq("clerk_user_id", input.clerkUserId);
+
+    if (updateError) {
+      return { saved: false, charged: false, error: updateError.message };
+    }
+
+    await supabase.from("magi_credit_events").insert({
+      clerk_user_id: input.clerkUserId,
+      delta: -input.creditsCharged,
+      reason: "magi_run",
+      metadata: {
+        mode: input.mode,
+        promptLength: input.prompt.length,
+      },
+    });
+  }
+
+  const { error: runError } = await supabase.from("magi_runs").insert({
+    clerk_user_id: input.clerkUserId,
+    mode: input.mode,
+    prompt: input.prompt,
+    final_answer: input.finalAnswer ?? null,
+    credits_charged: shouldCharge ? input.creditsCharged : 0,
+    provider_usage: input.providerUsage ?? [],
+    dossier: input.dossier,
+  });
+
+  if (runError) {
+    return { saved: false, charged: shouldCharge, error: runError.message };
+  }
+
+  return { saved: true, charged: shouldCharge };
 }

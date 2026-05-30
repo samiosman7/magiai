@@ -1,4 +1,4 @@
-import { checkCreditAccess } from "@/lib/billing/credits";
+import { checkCreditAccess, recordRunAndChargeCredits } from "@/lib/billing/credits";
 import { runMagiPipeline } from "@/lib/magi/pipeline";
 import type { GeminiModel, MagiEvent, MagiMode } from "@/lib/magi/types";
 
@@ -62,7 +62,11 @@ export async function POST(request: Request) {
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
+      const dossier: MagiEvent[] = [];
+      let finalAnswer = "";
       const emit = (event: MagiEvent) => {
+        dossier.push(event);
+        if (event.type === "final") finalAnswer = event.answer;
         controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
       };
 
@@ -79,6 +83,14 @@ export async function POST(request: Request) {
           message: error instanceof Error ? error.message : "MAGI pipeline failed.",
         });
       } finally {
+        await recordRunAndChargeCredits({
+          clerkUserId: userId,
+          mode,
+          prompt,
+          finalAnswer,
+          creditsCharged: creditCheck.creditsRequired,
+          dossier,
+        }).catch(() => null);
         controller.close();
       }
     },
