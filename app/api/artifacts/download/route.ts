@@ -1,6 +1,9 @@
 import JSZip from "jszip";
+import { saveArtifactPackage } from "@/lib/artifacts/store";
 import { generateUniversalArtifactProject } from "@/lib/artifacts/universal-generator";
+import { getRequestUserId } from "@/lib/auth/user";
 import type { GeminiModel, MagiArtifact, MagiMode } from "@/lib/magi/types";
+import { checkRateLimit, rateLimitResponse } from "@/lib/security/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,6 +30,15 @@ const validGeminiModels = new Set([
 ]);
 
 export async function POST(request: Request) {
+  const userId = getRequestUserId(request);
+  const rateLimit = checkRateLimit({
+    key: `artifact:${userId}`,
+    limit: Number(process.env.MAGI_ARTIFACT_RATE_LIMIT || 20),
+    windowMs: 60 * 60 * 1000,
+  });
+
+  if (!rateLimit.allowed) return rateLimitResponse(rateLimit.resetAt);
+
   const body = (await request.json().catch(() => null)) as {
     prompt?: unknown;
     mode?: unknown;
@@ -53,6 +65,12 @@ export async function POST(request: Request) {
     geminiModel,
     requestedType: artifactType,
   });
+  await saveArtifactPackage({
+    userId,
+    artifactType: artifactType || "answer",
+    project,
+    metadata: { route: "universal_artifact_download", mode },
+  }).catch(() => null);
   const zip = new JSZip();
 
   for (const file of project.files) {

@@ -554,7 +554,9 @@ select:disabled {
 .skill-log,
 .mcp-log,
 .artifact-log,
-.history-log {
+.history-log,
+.saved-artifact-log,
+.provider-log {
   display: grid;
   gap: 10px;
   margin-top: 12px;
@@ -647,6 +649,45 @@ select:disabled {
   text-transform: uppercase;
 }
 
+.billing-box {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.billing-box p {
+  margin: 0;
+  color: var(--muted);
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.billing-box code {
+  display: block;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--blue);
+  font-size: 0.72rem;
+  overflow-wrap: anywhere;
+}
+
+.billing-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.billing-actions button {
+  min-height: 40px;
+  padding: 8px;
+  background: rgba(255, 207, 90, 0.12);
+  border: 1px solid rgba(255, 207, 90, 0.32);
+  color: var(--amber);
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 0.7rem;
+}
+
 .history-output {
   display: grid;
   gap: 4px;
@@ -658,6 +699,44 @@ select:disabled {
   color: var(--text);
   text-align: left;
   text-transform: none;
+}
+
+.saved-artifact-output {
+  display: grid;
+  gap: 5px;
+  padding: 11px;
+  border-left: 4px solid var(--blue);
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.saved-artifact-output strong {
+  color: var(--amber);
+  font-family: Consolas, "Courier New", monospace;
+  text-transform: uppercase;
+}
+
+.saved-artifact-output code,
+.saved-artifact-output small {
+  color: var(--muted);
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 0.72rem;
+  overflow-wrap: anywhere;
+  text-transform: uppercase;
+}
+
+.provider-output {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.provider-output strong {
+  color: var(--amber);
+  font-family: Consolas, "Courier New", monospace;
+  text-transform: uppercase;
 }
 
 .history-output strong,

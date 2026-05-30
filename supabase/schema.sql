@@ -1,3 +1,5 @@
+create extension if not exists pgcrypto;
+
 create table if not exists public.magi_profiles (
   clerk_user_id text primary key,
   email text,

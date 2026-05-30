@@ -49,6 +49,7 @@ export async function checkCreditAccess(
   }
 
   const supabase = getSupabaseAdmin();
+  await ensureCreditProfile(clerkUserId);
   const { data, error } = await supabase
     .from("magi_profiles")
     .select("credits")
@@ -87,6 +88,7 @@ export async function recordRunAndChargeCredits(input: RunRecordInput) {
   if (!hasSupabaseConfig()) return { saved: false, charged: false };
 
   const supabase = getSupabaseAdmin();
+  await ensureCreditProfile(input.clerkUserId);
   const shouldCharge = process.env.MAGI_REQUIRE_BILLING === "true" && input.creditsCharged > 0;
 
   if (shouldCharge) {
@@ -136,4 +138,23 @@ export async function recordRunAndChargeCredits(input: RunRecordInput) {
   }
 
   return { saved: true, charged: shouldCharge };
+}
+
+export async function ensureCreditProfile(clerkUserId: string) {
+  if (!hasSupabaseConfig()) return;
+
+  const supabase = getSupabaseAdmin();
+  const { data } = await supabase
+    .from("magi_profiles")
+    .select("clerk_user_id")
+    .eq("clerk_user_id", clerkUserId)
+    .maybeSingle();
+
+  if (data) return;
+
+  await supabase.from("magi_profiles").insert({
+    clerk_user_id: clerkUserId,
+    plan: "free",
+    credits: Number(process.env.MAGI_FREE_CREDITS || 5),
+  });
 }

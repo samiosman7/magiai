@@ -1,6 +1,8 @@
 import { checkCreditAccess, recordRunAndChargeCredits } from "@/lib/billing/credits";
+import { getRequestUserId } from "@/lib/auth/user";
 import { runMagiPipeline } from "@/lib/magi/pipeline";
 import type { GeminiModel, MagiEvent, MagiMode } from "@/lib/magi/types";
+import { checkRateLimit, rateLimitResponse } from "@/lib/security/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,7 +28,14 @@ const validGeminiModels = new Set([
 ]);
 
 export async function POST(request: Request) {
-  const userId = "local-test-user";
+  const userId = getRequestUserId(request);
+  const rateLimit = checkRateLimit({
+    key: `magi:${userId}`,
+    limit: Number(process.env.MAGI_RUN_RATE_LIMIT || 30),
+    windowMs: 60 * 60 * 1000,
+  });
+
+  if (!rateLimit.allowed) return rateLimitResponse(rateLimit.resetAt);
 
   const body = (await request.json().catch(() => null)) as {
     prompt?: unknown;

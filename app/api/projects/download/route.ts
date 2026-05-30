@@ -1,6 +1,9 @@
 import JSZip from "jszip";
+import { saveArtifactPackage } from "@/lib/artifacts/store";
+import { getRequestUserId } from "@/lib/auth/user";
 import { generateAgenticWebsiteProject } from "@/lib/projects/agentic-project-generator";
 import type { GeminiModel } from "@/lib/magi/types";
+import { checkRateLimit, rateLimitResponse } from "@/lib/security/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,6 +28,15 @@ const validGeminiModels = new Set([
 ]);
 
 export async function POST(request: Request) {
+  const userId = getRequestUserId(request);
+  const rateLimit = checkRateLimit({
+    key: `website-artifact:${userId}`,
+    limit: Number(process.env.MAGI_ARTIFACT_RATE_LIMIT || 20),
+    windowMs: 60 * 60 * 1000,
+  });
+
+  if (!rateLimit.allowed) return rateLimitResponse(rateLimit.resetAt);
+
   const body = (await request.json().catch(() => null)) as {
     prompt?: unknown;
     geminiModel?: unknown;
@@ -39,6 +51,12 @@ export async function POST(request: Request) {
   }
 
   const project = await generateAgenticWebsiteProject(prompt, geminiModel);
+  await saveArtifactPackage({
+    userId,
+    artifactType: "project",
+    project,
+    metadata: { route: "website_download", geminiModel },
+  }).catch(() => null);
   const zip = new JSZip();
 
   for (const file of project.files) {

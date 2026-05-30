@@ -70,6 +70,21 @@ type WorkspaceRun = {
   createdAt: string;
 };
 
+type SavedArtifact = {
+  id: string;
+  artifact_type: string;
+  title: string;
+  status: string;
+  summary?: string;
+  created_at: string;
+};
+
+type ProviderStatus = {
+  provider: string;
+  configured: boolean;
+  keyCount: number;
+};
+
 type MagiEvent =
   | { type: "status"; step: PipelineStep; message: string }
   | { type: "node"; name: string; text: string }
@@ -109,6 +124,10 @@ export default function Home() {
   const [taskProfile, setTaskProfile] = useState<TaskProfile | null>(null);
   const [artifacts, setArtifacts] = useState<MagiArtifact[]>([]);
   const [workspaceRuns, setWorkspaceRuns] = useState<WorkspaceRun[]>([]);
+  const [savedArtifacts, setSavedArtifacts] = useState<SavedArtifact[]>([]);
+  const [providers, setProviders] = useState<ProviderStatus[]>([]);
+  const [mockMode, setMockMode] = useState(false);
+  const [operatorId, setOperatorId] = useState("");
   const [mcpServers, setMcpServers] = useState<McpServerStatus[]>([]);
   const [mcpCatalog, setMcpCatalog] = useState<McpCatalogEntry[]>([]);
   const [isRunning, setIsRunning] = useState(false);
@@ -124,6 +143,11 @@ export default function Home() {
   }, [mode]);
 
   useEffect(() => {
+    const storedOperator = window.localStorage.getItem("magi.operatorId");
+    const nextOperator = storedOperator || `operator-${crypto.randomUUID()}`;
+    window.localStorage.setItem("magi.operatorId", nextOperator);
+    setOperatorId(nextOperator);
+
     let mounted = true;
 
     fetch("/api/mcp/servers")
@@ -144,6 +168,18 @@ export default function Home() {
         if (mounted) setMcpCatalog([]);
       });
 
+    fetch("/api/providers")
+      .then((response) => (response.ok ? response.json() : { providers: [] }))
+      .then((data: { providers?: ProviderStatus[]; mockMode?: boolean }) => {
+        if (mounted) {
+          setProviders(data.providers ?? []);
+          setMockMode(Boolean(data.mockMode));
+        }
+      })
+      .catch(() => {
+        if (mounted) setProviders([]);
+      });
+
     return () => {
       mounted = false;
     };
@@ -159,6 +195,45 @@ export default function Home() {
       setWorkspaceRuns([]);
     }
   }, []);
+
+  useEffect(() => {
+    if (!operatorId) return;
+
+    fetch("/api/runs", {
+      headers: { "x-magi-user-id": operatorId },
+    })
+      .then((response) => (response.ok ? response.json() : { runs: [] }))
+      .then((data: { runs?: Array<{ id: string; prompt: string; final_answer?: string; created_at: string }> }) => {
+        if (!data.runs?.length) return;
+        setWorkspaceRuns((current) => {
+          const remoteRuns = data.runs!.map((run) => ({
+            id: run.id,
+            prompt: run.prompt,
+            taskLabel: "Saved MAGI run",
+            artifactType: "answer",
+            finalAnswer: run.final_answer || "No final answer was stored for this run.",
+            createdAt: run.created_at,
+          }));
+          const merged = [...remoteRuns, ...current];
+          const seen = new Set<string>();
+          return merged.filter((run) => {
+            if (seen.has(run.id)) return false;
+            seen.add(run.id);
+            return true;
+          }).slice(0, 20);
+        });
+      })
+      .catch(() => null);
+
+    fetch("/api/artifacts", {
+      headers: { "x-magi-user-id": operatorId },
+    })
+      .then((response) => (response.ok ? response.json() : { artifacts: [] }))
+      .then((data: { artifacts?: SavedArtifact[] }) => {
+        setSavedArtifacts(data.artifacts ?? []);
+      })
+      .catch(() => null);
+  }, [operatorId]);
 
   useEffect(() => {
     window.localStorage.setItem("magi.workspaceRuns", JSON.stringify(workspaceRuns.slice(0, 20)));
@@ -185,7 +260,7 @@ export default function Home() {
     try {
       const response = await fetch("/api/magi", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-magi-user-id": operatorId },
         body: JSON.stringify({ prompt: trimmed, mode, geminiModel }),
         signal: controller.signal,
       });
@@ -327,7 +402,7 @@ export default function Home() {
 
     const response = await fetch("/api/projects/download", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "x-magi-user-id": operatorId },
       body: JSON.stringify({ prompt: downloadPrompt, geminiModel }),
     });
 
@@ -375,7 +450,7 @@ export default function Home() {
 
     const response = await fetch("/api/artifacts/download", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "x-magi-user-id": operatorId },
       body: JSON.stringify({
         prompt: sourcePrompt,
         mode,
@@ -405,6 +480,29 @@ export default function Home() {
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
+  }
+
+  async function startCheckout(pack: "starter" | "pro" | "studio") {
+    const response = await fetch("/api/stripe/checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-magi-user-id": operatorId },
+      body: JSON.stringify({ pack }),
+    });
+    const data = (await response.json().catch(() => null)) as { url?: string; error?: string } | null;
+
+    if (response.ok && data?.url) {
+      window.location.href = data.url;
+      return;
+    }
+
+    setMessages((current) => [
+      ...current,
+      {
+        id: createId(),
+        kind: "status",
+        text: data?.error || "Checkout is not configured yet.",
+      },
+    ]);
   }
 
   return (
@@ -602,6 +700,25 @@ export default function Home() {
           </div>
         </details>
 
+        <details className="node-card">
+          <summary>Credits</summary>
+          <div className="billing-box">
+            <p>Operator id</p>
+            <code>{operatorId || "initializing"}</code>
+            <div className="billing-actions">
+              <button type="button" onClick={() => startCheckout("starter")}>
+                25 credits
+              </button>
+              <button type="button" onClick={() => startCheckout("pro")}>
+                120 credits
+              </button>
+              <button type="button" onClick={() => startCheckout("studio")}>
+                400 credits
+              </button>
+            </div>
+          </div>
+        </details>
+
         <details className="node-card" open>
           <summary>Node outputs</summary>
           <div className="node-log">
@@ -612,6 +729,24 @@ export default function Home() {
                 <div className="node-output" key={`${output.name}-${index}`}>
                   <strong>{output.name}</strong>
                   <span>{output.text}</span>
+                </div>
+              ))
+            )}
+          </div>
+        </details>
+
+        <details className="node-card">
+          <summary>Saved artifacts</summary>
+          <div className="saved-artifact-log">
+            {savedArtifacts.length === 0 ? (
+              <p>No Supabase artifacts saved yet.</p>
+            ) : (
+              savedArtifacts.map((artifact) => (
+                <div className="saved-artifact-output" key={artifact.id}>
+                  <strong>{artifact.title}</strong>
+                  <code>{artifact.artifact_type} | {artifact.status}</code>
+                  {artifact.summary && <p>{artifact.summary}</p>}
+                  <small>{new Date(artifact.created_at).toLocaleString()}</small>
                 </div>
               ))
             )}
@@ -642,6 +777,21 @@ export default function Home() {
                 </button>
               ))
             )}
+          </div>
+        </details>
+
+        <details className="node-card">
+          <summary>Providers</summary>
+          <div className="provider-log">
+            <p>{mockMode ? "Mock mode is on. Live providers will not be used." : "Live provider routing is enabled."}</p>
+            {providers.map((provider) => (
+              <div className="provider-output" key={provider.provider}>
+                <strong>{provider.provider}</strong>
+                <span className={provider.configured ? "mcp-ok" : "mcp-fail"}>
+                  {provider.configured ? `${provider.keyCount} key(s)` : "Not configured"}
+                </span>
+              </div>
+            ))}
           </div>
         </details>
 

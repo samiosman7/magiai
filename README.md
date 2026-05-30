@@ -50,9 +50,19 @@ QWEN_API_KEY=
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 SUPABASE_SECRET_KEY=
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
+STRIPE_PRICE_STARTER=
+STRIPE_PRICE_PRO=
+STRIPE_PRICE_STUDIO=
+NEXT_PUBLIC_APP_URL=
 MCP_SERVERS_JSON=
 MAGI_MOCK_MODE=false
 MAGI_REQUIRE_BILLING=false
+MAGI_FREE_CREDITS=5
+MAGI_RUN_RATE_LIMIT=30
+MAGI_ARTIFACT_RATE_LIMIT=20
 ```
 
 Leave `MAGI_MOCK_MODE=true` if you want to test the app without calling paid model APIs.
@@ -101,6 +111,17 @@ Check the curated MCP catalog at:
 
 ```text
 /api/mcp/catalog
+```
+
+Useful operational endpoints:
+
+```text
+/api/providers
+/api/runs
+/api/artifacts
+/api/artifacts/download
+/api/stripe/checkout
+/api/stripe/webhook
 ```
 
 Included catalog entries:
