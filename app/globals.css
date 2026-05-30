@@ -552,7 +552,8 @@ select:disabled {
 
 .node-log,
 .skill-log,
-.mcp-log {
+.mcp-log,
+.artifact-log {
   display: grid;
   gap: 10px;
   margin-top: 12px;
@@ -560,7 +561,9 @@ select:disabled {
 
 .node-output,
 .skill-output,
-.mcp-output {
+.mcp-output,
+.artifact-output,
+.task-route {
   padding: 11px;
   background: rgba(0, 0, 0, 0.35);
 }
@@ -574,9 +577,16 @@ select:disabled {
   border-left: 4px solid var(--amber);
 }
 
+.artifact-output,
+.task-route {
+  border-left: 4px solid var(--blue);
+}
+
 .node-output strong,
 .skill-output strong,
-.mcp-output strong {
+.mcp-output strong,
+.artifact-output strong,
+.task-route strong {
   display: block;
   margin-bottom: 4px;
   color: var(--amber);
@@ -585,7 +595,8 @@ select:disabled {
 }
 
 .skill-output ul,
-.mcp-output ul {
+.mcp-output ul,
+.task-route ul {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
@@ -595,7 +606,9 @@ select:disabled {
 }
 
 .skill-output code,
-.mcp-output code {
+.mcp-output code,
+.artifact-output code,
+.task-route code {
   display: block;
   margin-top: 4px;
   color: var(--muted);
@@ -604,10 +617,30 @@ select:disabled {
 }
 
 .skill-output li,
-.mcp-output li {
+.mcp-output li,
+.task-route li {
   padding: 5px 7px;
   border: 1px solid rgba(255, 207, 90, 0.32);
   color: var(--muted);
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.artifact-action {
+  margin-top: 8px;
+  padding: 9px 11px;
+  background: var(--amber);
+  color: #0d0d0d;
+  font-size: 0.74rem;
+}
+
+.artifact-pill {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 6px 8px;
+  border: 1px solid rgba(115, 199, 255, 0.42);
+  color: var(--blue);
   font-family: Consolas, "Courier New", monospace;
   font-size: 0.72rem;
   text-transform: uppercase;

@@ -2,6 +2,7 @@ import { getModelPlan } from "./model-plan";
 import { generateText } from "./providers";
 import { buildMagiRuntimeContext } from "./runtime-context";
 import { skillLabels, skillPackPaths, skillPrompt } from "./skills";
+import { classifyTask, createPlannedArtifact } from "./task-router";
 import type { DifficultyResult, GeminiModel, JudgeResult, MagiEvent, MagiMode, PipelineStep } from "./types";
 
 type Emit = (event: MagiEvent) => void;
@@ -16,10 +17,11 @@ export async function runMagiPipeline(
   emit: Emit,
   geminiModel?: GeminiModel
 ) {
+  const taskProfile = classifyTask(prompt);
   activate("scan", emit);
   emit({ type: "status", step: "scan", message: "Difficulty scan running..." });
   const [difficulty, runtimeContext] = await Promise.all([
-    Promise.resolve(scanDifficulty(prompt)),
+    Promise.resolve(scanDifficulty(prompt, taskProfile.complexityBoost)),
     buildMagiRuntimeContext(prompt),
     wait(120),
   ]).then(([result, context]) => [result, context] as const);
@@ -42,6 +44,21 @@ export async function runMagiPipeline(
   }
   complete("scan", emit);
 
+  activate("route", emit);
+  emit({ type: "task", profile: taskProfile });
+  emit({
+    type: "node",
+    name: "Task router",
+    text: [
+      `${taskProfile.label} selected.`,
+      `Artifact type: ${taskProfile.artifactType}.`,
+      `Skill packs: ${taskProfile.skillPacks.join(", ")}.`,
+      `Judge rubric: ${taskProfile.judgeRubric}`,
+    ].join(" "),
+  });
+  emit({ type: "artifact", artifact: createPlannedArtifact(taskProfile, prompt) });
+  complete("route", emit);
+
   if (!difficulty.complex) {
     activate("final", emit);
     emit({ type: "status", step: "final", message: "Direct route selected. Generating answer..." });
@@ -62,7 +79,7 @@ export async function runMagiPipeline(
   const melchiorPlan = getModelPlan(mode, "melchior", geminiModel);
   const melchior = await generateText({
     ...melchiorPlan,
-    system: `${productContext}\n\nYou are Melchior, the correction and gap-filling node. Repair missing steps, identify assumptions, preserve the user's goal, and return a concise repaired draft.\n\n${skillPrompt("melchior")}\n\nFull Melchior SKILL.md:\n${runtimeContext.nodeSkillContext.melchior}\n\n${runtimeContext.mcpContext}\n\nMCP tool execution context:\n${runtimeContext.mcpToolContext}`,
+    system: `${productContext}\n\nTask route:\n${JSON.stringify(taskProfile, null, 2)}\n\nYou are Melchior, the correction and gap-filling node. Repair missing steps, identify assumptions, preserve the user's goal, and return a concise repaired draft. Adapt the repair to the selected task route and artifact type.\n\n${skillPrompt("melchior")}\n\nFull Melchior SKILL.md:\n${runtimeContext.nodeSkillContext.melchior}\n\n${runtimeContext.mcpContext}\n\nMCP tool execution context:\n${runtimeContext.mcpToolContext}`,
     prompt,
     maxTokens: 900,
   });
@@ -80,7 +97,7 @@ export async function runMagiPipeline(
   const balthasarPlan = getModelPlan(mode, "balthasar", geminiModel);
   const balthasar = await generateText({
     ...balthasarPlan,
-    system: `${productContext}\n\nYou are Balthasar, the builder and hardener. Turn the repaired draft into a concrete, polished, directly usable answer. Do not mention internal deliberation.\n\n${skillPrompt("balthasar")}\n\nFull Balthasar SKILL.md:\n${runtimeContext.nodeSkillContext.balthasar}\n\nProject and cross-functional skill packs:\n${runtimeContext.projectSkillContext}\n\n${runtimeContext.mcpContext}\n\nMCP tool execution context:\n${runtimeContext.mcpToolContext}`,
+    system: `${productContext}\n\nTask route:\n${JSON.stringify(taskProfile, null, 2)}\n\nYou are Balthasar, the builder and hardener. Turn the repaired draft into a concrete, polished, directly usable answer or artifact-ready result. Do not mention internal deliberation. If the route is not website, do not force website language.\n\n${skillPrompt("balthasar")}\n\nFull Balthasar SKILL.md:\n${runtimeContext.nodeSkillContext.balthasar}\n\nProject and cross-functional skill packs:\n${runtimeContext.projectSkillContext}\n\n${runtimeContext.mcpContext}\n\nMCP tool execution context:\n${runtimeContext.mcpToolContext}`,
     prompt: `Original prompt:\n${prompt}\n\nMelchior repaired draft:\n${melchior.text}`,
     maxTokens: 1200,
   });
@@ -108,7 +125,7 @@ export async function runMagiPipeline(
     runJudgeLikeNode(
       mode,
       "casper",
-      `${productContext}\n\nYou are Casper, the intent-preservation and dramatic-change monitor. Return strict JSON with passed, issue, and rationale. Flag only if the answer drifts from the original request.\n\n${skillPrompt("casper")}\n\nFull Casper SKILL.md:\n${runtimeContext.nodeSkillContext.casper}\n\n${runtimeContext.mcpContext}\n\nMCP tool execution context:\n${runtimeContext.mcpToolContext}`,
+      `${productContext}\n\nTask route:\n${JSON.stringify(taskProfile, null, 2)}\n\nYou are Casper, the intent-preservation and dramatic-change monitor. Return strict JSON with passed, issue, and rationale. Flag only if the answer drifts from the original request or forces the wrong artifact type.\n\n${skillPrompt("casper")}\n\nFull Casper SKILL.md:\n${runtimeContext.nodeSkillContext.casper}\n\n${runtimeContext.mcpContext}\n\nMCP tool execution context:\n${runtimeContext.mcpToolContext}`,
       prompt,
       balthasar.text,
       geminiModel
@@ -116,7 +133,7 @@ export async function runMagiPipeline(
     runJudgeLikeNode(
       mode,
       "judge",
-      `${productContext}\n\nYou are a fresh, independent correctness judge. Return strict JSON with passed, issue, and rationale. Flag only blocking factual, logic, or instruction-following problems.\n\n${skillPrompt("judge")}\n\nFull Fact Judge SKILL.md:\n${runtimeContext.nodeSkillContext.judge}\n\n${runtimeContext.mcpContext}\n\nMCP tool execution context:\n${runtimeContext.mcpToolContext}`,
+      `${productContext}\n\nTask route:\n${JSON.stringify(taskProfile, null, 2)}\n\nYou are a fresh, independent correctness judge. Return strict JSON with passed, issue, and rationale. Flag only blocking factual, logic, or instruction-following problems. Use this route-specific rubric: ${taskProfile.judgeRubric}\n\n${skillPrompt("judge")}\n\nFull Fact Judge SKILL.md:\n${runtimeContext.nodeSkillContext.judge}\n\n${runtimeContext.mcpContext}\n\nMCP tool execution context:\n${runtimeContext.mcpToolContext}`,
       prompt,
       balthasar.text,
       geminiModel
@@ -172,7 +189,7 @@ function complete(step: PipelineStep, emit: Emit) {
   emit({ type: "step", step, state: "done" });
 }
 
-function scanDifficulty(prompt: string): DifficultyResult {
+function scanDifficulty(prompt: string, complexityBoost = 0): DifficultyResult {
   const words = prompt.trim().split(/\s+/).filter(Boolean).length;
   const lower = prompt.toLowerCase();
   if (
@@ -207,7 +224,7 @@ function scanDifficulty(prompt: string): DifficultyResult {
     "ui",
   ];
   const hits = terms.filter((term) => lower.includes(term)).length;
-  const score = words + hits * 8 + (prompt.match(/[?.,;:]/g) || []).length;
+  const score = words + hits * 8 + (prompt.match(/[?.,;:]/g) || []).length + complexityBoost;
   return {
     complex: score >= 18,
     score,

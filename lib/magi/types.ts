@@ -20,6 +20,7 @@ export type GeminiModel =
 
 export type PipelineStep =
   | "scan"
+  | "route"
   | "melchior"
   | "balthasar"
   | "casper"
@@ -56,10 +57,45 @@ export type JudgeResult = {
   rationale: string;
 };
 
+export type TaskKind =
+  | "general"
+  | "coding"
+  | "research"
+  | "writing"
+  | "analysis"
+  | "data"
+  | "website"
+  | "automation";
+
+export type TaskProfile = {
+  kind: TaskKind;
+  label: string;
+  complexityBoost: number;
+  artifactType: MagiArtifact["type"];
+  skillPacks: string[];
+  judgeRubric: string;
+  toolHints: string[];
+  secondaryKinds: TaskKind[];
+};
+
+export type MagiArtifact = {
+  id: string;
+  type: "answer" | "document" | "report" | "code" | "project" | "data" | "plan";
+  title: string;
+  status: "planned" | "drafted" | "ready_for_export";
+  summary: string;
+  actions: Array<{
+    label: string;
+    action: "download_website" | "save_planned";
+  }>;
+};
+
 export type MagiEvent =
   | { type: "status"; step: PipelineStep; message: string }
   | { type: "node"; name: string; text: string }
   | { type: "skills"; node: string; skills: string[]; sourcePath?: string }
+  | { type: "task"; profile: TaskProfile }
+  | { type: "artifact"; artifact: MagiArtifact }
   | { type: "step"; step: PipelineStep; state: "" | "active" | "done" }
   | { type: "final"; answer: string }
   | { type: "error"; message: string };

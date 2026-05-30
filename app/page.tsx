@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
-type PipelineStep = "scan" | "melchior" | "balthasar" | "casper" | "judge" | "final";
+type PipelineStep = "scan" | "route" | "melchior" | "balthasar" | "casper" | "judge" | "final";
 type StepState = "" | "active" | "done";
 
 type Message = {
@@ -42,16 +42,38 @@ type McpCatalogEntry = {
   sourceUrl: string;
 };
 
+type TaskProfile = {
+  kind: string;
+  label: string;
+  artifactType: string;
+  skillPacks: string[];
+  judgeRubric: string;
+  toolHints: string[];
+  secondaryKinds: string[];
+};
+
+type MagiArtifact = {
+  id: string;
+  type: string;
+  title: string;
+  status: string;
+  summary: string;
+  actions: Array<{ label: string; action: "download_website" | "save_planned" }>;
+};
+
 type MagiEvent =
   | { type: "status"; step: PipelineStep; message: string }
   | { type: "node"; name: string; text: string }
   | { type: "skills"; node: string; skills: string[]; sourcePath?: string }
+  | { type: "task"; profile: TaskProfile }
+  | { type: "artifact"; artifact: MagiArtifact }
   | { type: "step"; step: PipelineStep; state: StepState }
   | { type: "final"; answer: string }
   | { type: "error"; message: string };
 
 const pipelineItems: Array<{ step: PipelineStep; label: string }> = [
   { step: "scan", label: "Difficulty scan" },
+  { step: "route", label: "Task router" },
   { step: "melchior", label: "Melchior repairs gaps" },
   { step: "balthasar", label: "Balthasar hardens answer" },
   { step: "casper", label: "Casper checks intent" },
@@ -75,6 +97,8 @@ export default function Home() {
   const [steps, setSteps] = useState<Record<PipelineStep, StepState>>(initialSteps);
   const [nodeOutputs, setNodeOutputs] = useState<NodeOutput[]>([]);
   const [skillOutputs, setSkillOutputs] = useState<SkillOutput[]>([]);
+  const [taskProfile, setTaskProfile] = useState<TaskProfile | null>(null);
+  const [artifacts, setArtifacts] = useState<MagiArtifact[]>([]);
   const [mcpServers, setMcpServers] = useState<McpServerStatus[]>([]);
   const [mcpCatalog, setMcpCatalog] = useState<McpCatalogEntry[]>([]);
   const [isRunning, setIsRunning] = useState(false);
@@ -128,6 +152,8 @@ export default function Home() {
     setSteps(initialSteps);
     setNodeOutputs([]);
     setSkillOutputs([]);
+    setTaskProfile(null);
+    setArtifacts([]);
 
     try {
       const response = await fetch("/api/magi", {
@@ -199,6 +225,19 @@ export default function Home() {
       return;
     }
 
+    if (event.type === "task") {
+      setTaskProfile(event.profile);
+      return;
+    }
+
+    if (event.type === "artifact") {
+      setArtifacts((current) => [
+        ...current.filter((artifact) => artifact.id !== event.artifact.id),
+        event.artifact,
+      ]);
+      return;
+    }
+
     if (event.type === "step") {
       setSteps((current) => ({ ...current, [event.step]: event.state }));
       return;
@@ -229,6 +268,8 @@ export default function Home() {
     setSteps(initialSteps);
     setNodeOutputs([]);
     setSkillOutputs([]);
+    setTaskProfile(null);
+    setArtifacts([]);
     setIsRunning(false);
   }
 
@@ -414,6 +455,62 @@ export default function Home() {
             </li>
           ))}
         </ol>
+
+        <details className="node-card" open>
+          <summary>Task route</summary>
+          {taskProfile ? (
+            <div className="task-route">
+              <strong>{taskProfile.label}</strong>
+              <code>{taskProfile.kind} | artifact: {taskProfile.artifactType}</code>
+              <p>{taskProfile.judgeRubric}</p>
+              <ul>
+                {taskProfile.toolHints.map((hint) => (
+                  <li key={hint}>{hint}</li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <p>No task route selected yet.</p>
+          )}
+        </details>
+
+        <details className="node-card" open>
+          <summary>Artifacts</summary>
+          <div className="artifact-log">
+            {artifacts.length === 0 ? (
+              <p>No artifacts planned yet.</p>
+            ) : (
+              artifacts.map((artifact) => (
+                <div className="artifact-output" key={artifact.id}>
+                  <strong>{artifact.title}</strong>
+                  <code>{artifact.type} | {artifact.status}</code>
+                  <p>{artifact.summary}</p>
+                  {artifact.actions.map((action) =>
+                    action.action === "download_website" ? (
+                      <button
+                        className="artifact-action"
+                        key={action.label}
+                        type="button"
+                        onClick={() => {
+                          const sourcePrompt = [...messages]
+                            .reverse()
+                            .find((message) => message.kind === "user")?.text;
+                          if (sourcePrompt) downloadProject(sourcePrompt);
+                        }}
+                      >
+                        {action.label}
+                      </button>
+                    ) : (
+                      <span className="artifact-pill" key={action.label}>
+                        {action.label}
+                      </span>
+                    )
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </details>
 
         <details className="node-card" open>
           <summary>Node outputs</summary>
