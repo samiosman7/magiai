@@ -513,38 +513,52 @@ export default function Home() {
             <div className="nerv-mark" aria-hidden="true">
               NERV
             </div>
-            <p className="kicker">Magi command authority</p>
-            <h1>The Magi has decided.</h1>
+            <p className="kicker">MAGI-01 ORIGINAL</p>
+            <h1>Central Dogma Command</h1>
           </div>
           <div className="signal" aria-label="System status">
             <span />
-            Synced
+            {isRunning ? "Active" : "Synced"}
           </div>
           <div className="auth-station" aria-label="Operator authentication">
             <div>
               <small>Operator</small>
-              <strong>Test Session</strong>
+              <strong>{operatorId ? operatorId.replace("operator-", "OP-").slice(0, 18) : "Linking"}</strong>
             </div>
           </div>
         </header>
 
         <section className="console" aria-live="polite">
           <div className="warning-strip" aria-hidden="true">
-            <span>Central Dogma</span>
+            <span>Damage type defense screen</span>
             <span>{modeLabel}</span>
-            <span>MAGI-OS</span>
+            <span>Condition: {isRunning ? "Red" : "Green"}</span>
           </div>
 
           {!hasMessages && (
             <div className="empty-state">
-              <div className="mark" aria-hidden="true">
-                M
+              <div className="magi-display" aria-hidden="true">
+                <div className="magi-ring magi-ring-one" />
+                <div className="magi-ring magi-ring-two" />
+                <div className="magi-ring magi-ring-three" />
+                <div className="magi-axis axis-a">MELCHIOR</div>
+                <div className="magi-axis axis-b">BALTHASAR</div>
+                <div className="magi-axis axis-c">CASPER</div>
+                <div className="magi-core">
+                  <span>MAGI</span>
+                  <strong>01</strong>
+                </div>
               </div>
-              <h2>Three AIs. One answer. No blind spots.</h2>
+              <h2>The Magi has decided.</h2>
               <p>
-                Choose a mode, enter a directive, and MAGI will route the request
-                through correction, hardening, intent review, and final judgment.
+                Three specialist intelligences route the directive through correction,
+                construction, intent defense, and final verification.
               </p>
+              <div className="readout-grid" aria-hidden="true">
+                <span>Protect no. 666</span>
+                <span>Security: check</span>
+                <span>Final gate: open</span>
+              </div>
             </div>
           )}
 
