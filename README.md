@@ -150,6 +150,7 @@ For local IDE clients, see `mcp.local.example.json`.
 Format references are listed in `magi-skills/REFERENCES.md`.
 
 Current model routing recommendations are saved in `docs/model-routing.md`.
+Claude-style hidden capacity and usage-limit notes are saved in `docs/usage-limits.md`.
 
 Website downloads are now generated through the agentic project builder path:
 
