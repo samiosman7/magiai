@@ -149,6 +149,8 @@ For local IDE clients, see `mcp.local.example.json`.
 
 Format references are listed in `magi-skills/REFERENCES.md`.
 
+Current model routing recommendations are saved in `docs/model-routing.md`.
+
 Website downloads are now generated through the agentic project builder path:
 
 - loads MAGI `SKILL.md` files from `magi-skills/`
