@@ -39,13 +39,13 @@ const plans: Record<MagiMode, Record<NodeName, Pick<ModelCall, "provider" | "mod
     casper: { provider: "vercel", model: "meta/llama-3.3-70b" }, // Adversary
     judge: { provider: "vercel", model: "deepseek/deepseek-v3" }, // Synthesis
   },
-  // premium: latest frontier models, one vendor per angle, Opus forging the final.
+  // premium: latest frontier models, one per angle.
   premium: {
     direct: { provider: "vercel", model: "anthropic/claude-sonnet-4.6" },
-    melchior: { provider: "vercel", model: "openai/gpt-5.3-chat" }, // Architect — ChatGPT
-    balthasar: { provider: "vercel", model: "google/gemini-3.1-pro-preview" }, // Maverick — Gemini
-    casper: { provider: "vercel", model: "anthropic/claude-sonnet-4.6" }, // Adversary — Sonnet
-    judge: { provider: "vercel", model: "anthropic/claude-opus-4.8" }, // Synthesis — Opus
+    melchior: { provider: "vercel", model: "google/gemini-3.1-pro-preview" }, // Architect — Gemini 3.1 Pro
+    balthasar: { provider: "vercel", model: "openai/gpt-5.5" }, // Maverick — GPT-5.5
+    casper: { provider: "vercel", model: "anthropic/claude-sonnet-4.6" }, // Adversary — Sonnet 4.6
+    judge: { provider: "vercel", model: "openai/gpt-5.5" }, // Synthesis — GPT-5.5
   },
 };
 
