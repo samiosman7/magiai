@@ -127,6 +127,19 @@ export async function runMagiPipeline(
   emit({ type: "node", name: `Synthesis (${synthesis.provider})`, text: preview(synthesis.text) });
   complete("judge", emit);
 
+  const costBreakdown = [
+    { node: "Architect", cost: architect.cost ?? 0 },
+    { node: "Maverick", cost: maverick.cost ?? 0 },
+    { node: "Adversary", cost: adversary.cost ?? 0 },
+    { node: "Synthesis", cost: synthesis.cost ?? 0 },
+  ];
+  emit({
+    type: "cost",
+    total: costBreakdown.reduce((sum, b) => sum + b.cost, 0),
+    mode,
+    breakdown: costBreakdown,
+  });
+
   const finalAnswer = synthesis.text;
 
   activate("final", emit);
@@ -225,6 +238,12 @@ async function directAnswer(
     type: "node",
     name: `Direct route (${answer.provider})`,
     text: preview(answer.text),
+  });
+  emit({
+    type: "cost",
+    total: answer.cost ?? 0,
+    mode,
+    breakdown: [{ node: "Direct", cost: answer.cost ?? 0 }],
   });
 
   return answer.text || "I could not generate an answer from the configured provider.";

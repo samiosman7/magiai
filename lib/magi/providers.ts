@@ -63,6 +63,7 @@ async function openAiCompatible(
 
   const data = (await response.json()) as {
     choices?: Array<{ message?: { content?: string } }>;
+    usage?: { cost?: number };
   };
 
   return {
@@ -70,6 +71,7 @@ async function openAiCompatible(
     provider: call.provider,
     model: call.model,
     isMock: false,
+    cost: typeof data.usage?.cost === "number" ? data.usage.cost : undefined,
   };
 }
 

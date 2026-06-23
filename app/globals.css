@@ -1163,3 +1163,16 @@ h1 {
   box-shadow: none;
 }
 .download-button { background: var(--red); color: #16100c; border: 0; font-weight: 700; }
+
+/* cost panel */
+.cost-box { display: grid; gap: 12px; padding: 4px 2px; }
+.cost-total { display: flex; align-items: baseline; gap: 10px; }
+.cost-total strong { font-size: 1.5rem; color: var(--text); }
+.cost-total code { color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; }
+.cost-breakdown { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.cost-breakdown li { display: flex; justify-content: space-between; font-size: 0.82rem; color: var(--muted); font-family: ui-monospace, "SF Mono", Consolas, monospace; }
+.cost-compare { border-top: 1px solid var(--line); padding-top: 10px; display: grid; gap: 5px; }
+.cost-compare > p { margin: 0 0 2px; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+.cost-compare-row { display: flex; justify-content: space-between; font-size: 0.85rem; font-family: ui-monospace, "SF Mono", Consolas, monospace; }
+.cost-compare-row span:first-child { text-transform: capitalize; color: var(--muted); }
+.cost-compare small { color: var(--dim); font-size: 0.76rem; }

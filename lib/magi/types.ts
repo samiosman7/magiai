@@ -43,6 +43,7 @@ export type ModelResult = {
   provider: ProviderName;
   model: string;
   isMock: boolean;
+  cost?: number; // actual billed USD for this call, when the provider reports it
 };
 
 export type DifficultyResult = {
@@ -97,5 +98,6 @@ export type MagiEvent =
   | { type: "task"; profile: TaskProfile }
   | { type: "artifact"; artifact: MagiArtifact }
   | { type: "step"; step: PipelineStep; state: "" | "active" | "done" }
+  | { type: "cost"; total: number; mode: string; breakdown: Array<{ node: string; cost: number }> }
   | { type: "final"; answer: string }
   | { type: "error"; message: string };

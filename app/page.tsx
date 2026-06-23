@@ -92,8 +92,11 @@ type MagiEvent =
   | { type: "task"; profile: TaskProfile }
   | { type: "artifact"; artifact: MagiArtifact }
   | { type: "step"; step: PipelineStep; state: StepState }
+  | { type: "cost"; total: number; mode: string; breakdown: Array<{ node: string; cost: number }> }
   | { type: "final"; answer: string }
   | { type: "error"; message: string };
+
+type RunCost = { total: number; mode: string; breakdown: Array<{ node: string; cost: number }> };
 
 const pipelineItems: Array<{ step: PipelineStep; label: string }> = [
   { step: "scan", label: "Difficulty scan" },
@@ -133,6 +136,8 @@ export default function Home() {
   const [mcpServers, setMcpServers] = useState<McpServerStatus[]>([]);
   const [mcpCatalog, setMcpCatalog] = useState<McpCatalogEntry[]>([]);
   const [isRunning, setIsRunning] = useState(false);
+  const [runCost, setRunCost] = useState<RunCost | null>(null);
+  const [costByMode, setCostByMode] = useState<Record<string, number>>({});
   const abortRef = useRef<AbortController | null>(null);
   const currentPromptRef = useRef("");
 
@@ -189,12 +194,21 @@ export default function Home() {
 
   useEffect(() => {
     const stored = window.localStorage.getItem("magi.workspaceRuns");
-    if (!stored) return;
+    if (stored) {
+      try {
+        setWorkspaceRuns(JSON.parse(stored) as WorkspaceRun[]);
+      } catch {
+        setWorkspaceRuns([]);
+      }
+    }
 
-    try {
-      setWorkspaceRuns(JSON.parse(stored) as WorkspaceRun[]);
-    } catch {
-      setWorkspaceRuns([]);
+    const storedCost = window.localStorage.getItem("magi.costByMode");
+    if (storedCost) {
+      try {
+        setCostByMode(JSON.parse(storedCost) as Record<string, number>);
+      } catch {
+        setCostByMode({});
+      }
     }
   }, []);
 
@@ -258,6 +272,7 @@ export default function Home() {
     setSkillOutputs([]);
     setTaskProfile(null);
     setArtifacts([]);
+    setRunCost(null);
 
     try {
       const response = await fetch("/api/magi", {
@@ -347,6 +362,16 @@ export default function Home() {
       return;
     }
 
+    if (event.type === "cost") {
+      setRunCost({ total: event.total, mode: event.mode, breakdown: event.breakdown });
+      setCostByMode((current) => {
+        const next = { ...current, [event.mode]: event.total };
+        window.localStorage.setItem("magi.costByMode", JSON.stringify(next));
+        return next;
+      });
+      return;
+    }
+
     if (event.type === "final") {
       const sourcePrompt = currentPromptRef.current;
       const currentArtifact = artifacts[artifacts.length - 1];
@@ -389,6 +414,7 @@ export default function Home() {
     setSkillOutputs([]);
     setTaskProfile(null);
     setArtifacts([]);
+    setRunCost(null);
     setIsRunning(false);
   }
 
@@ -619,6 +645,48 @@ export default function Home() {
             </li>
           ))}
         </ol>
+
+        <details className="node-card" open>
+          <summary>Run cost</summary>
+          <div className="cost-box">
+            {runCost ? (
+              <>
+                <div className="cost-total">
+                  <strong>${runCost.total.toFixed(4)}</strong>
+                  <code>{runCost.mode}</code>
+                </div>
+                <ul className="cost-breakdown">
+                  {runCost.breakdown.map((b) => (
+                    <li key={b.node}>
+                      <span>{b.node}</span>
+                      <span>${b.cost.toFixed(4)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <p>No run yet.</p>
+            )}
+            {Object.keys(costByMode).length > 0 && (
+              <div className="cost-compare">
+                <p>Cost per run by mode (last seen)</p>
+                {(["economy", "standard", "premium"] as const)
+                  .filter((m) => costByMode[m] != null)
+                  .map((m) => (
+                    <div className="cost-compare-row" key={m}>
+                      <span>{m}</span>
+                      <span>${costByMode[m].toFixed(4)}</span>
+                    </div>
+                  ))}
+                {costByMode.standard != null && costByMode.premium != null && costByMode.standard > 0 && (
+                  <small>
+                    Premium costs {Math.round(costByMode.premium / costByMode.standard)}× more than Standard.
+                  </small>
+                )}
+              </div>
+            )}
+          </div>
+        </details>
 
         <details className="node-card" open>
           <summary>Task route</summary>

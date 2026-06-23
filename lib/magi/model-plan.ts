@@ -31,20 +31,21 @@ const plans: Record<MagiMode, Record<NodeName, Pick<ModelCall, "provider" | "mod
     casper: { provider: "vercel", model: "deepseek/deepseek-v3" },
     judge: { provider: "vercel", model: "deepseek/deepseek-v3" },
   },
+  // standard: three different cheap AIs building on each other, plus a reliable synthesizer.
   standard: {
     direct: { provider: "vercel", model: "deepseek/deepseek-v3" },
-    melchior: { provider: "vercel", model: "deepseek/deepseek-v3" },
-    balthasar: { provider: "vercel", model: "deepseek/deepseek-v3" },
-    casper: { provider: "vercel", model: "deepseek/deepseek-v3" },
-    judge: { provider: "vercel", model: "deepseek/deepseek-v3" },
+    melchior: { provider: "vercel", model: "deepseek/deepseek-v3" }, // Architect
+    balthasar: { provider: "vercel", model: "alibaba/qwen3-next-80b-a3b-instruct" }, // Maverick
+    casper: { provider: "vercel", model: "meta/llama-3.3-70b" }, // Adversary
+    judge: { provider: "vercel", model: "deepseek/deepseek-v3" }, // Synthesis
   },
-  // premium runs the same angle chain on Sonnet 4.6 (the quality ceiling).
+  // premium: latest frontier models, one vendor per angle, Opus forging the final.
   premium: {
     direct: { provider: "vercel", model: "anthropic/claude-sonnet-4.6" },
-    melchior: { provider: "vercel", model: "anthropic/claude-sonnet-4.6" },
-    balthasar: { provider: "vercel", model: "anthropic/claude-sonnet-4.6" },
-    casper: { provider: "vercel", model: "anthropic/claude-sonnet-4.6" },
-    judge: { provider: "vercel", model: "anthropic/claude-sonnet-4.6" },
+    melchior: { provider: "vercel", model: "openai/gpt-5.3-chat" }, // Architect — ChatGPT
+    balthasar: { provider: "vercel", model: "google/gemini-3.1-pro-preview" }, // Maverick — Gemini
+    casper: { provider: "vercel", model: "anthropic/claude-sonnet-4.6" }, // Adversary — Sonnet
+    judge: { provider: "vercel", model: "anthropic/claude-opus-4.8" }, // Synthesis — Opus
   },
 };
 
