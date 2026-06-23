@@ -112,6 +112,21 @@ const initialSteps = Object.fromEntries(
   pipelineItems.map(({ step }) => [step, ""])
 ) as Record<PipelineStep, StepState>;
 
+type ModeKey = "economy" | "standard" | "premium";
+
+const modeInfo: Record<ModeKey, { label: string; models: string; cost: string; blurb: string }> = {
+  economy: { label: "Economy", models: "DeepSeek V3", cost: "~$0.004", blurb: "One fast model" },
+  standard: { label: "Standard", models: "DeepSeek · Qwen3 · Llama 3.3", cost: "~$0.007", blurb: "Three cheap minds" },
+  premium: { label: "Premium", models: "Gemini 3.1 Pro · GPT-5.5 · Sonnet 4.6", cost: "~$0.05", blurb: "Frontier models" },
+};
+
+const heroRoles: Array<{ name: string; desc: string }> = [
+  { name: "Architect", desc: "drafts it by the book" },
+  { name: "Maverick", desc: "adds the bold angle" },
+  { name: "Adversary", desc: "attacks & hardens it" },
+  { name: "Synthesis", desc: "forges the final answer" },
+];
+
 function createId() {
   return crypto.randomUUID();
 }
@@ -557,20 +572,23 @@ export default function Home() {
         <section className="console" aria-live="polite">
           {!hasMessages && (
             <div className="empty-state">
-              <div className="magi-display" aria-hidden="true">
-                <div className="magi-ring magi-ring-one" />
-                <div className="magi-ring magi-ring-two" />
-                <div className="magi-core">
-                  <span>MAGI</span>
-                </div>
-                <div className="magi-axis axis-a">ARCHITECT</div>
-                <div className="magi-axis axis-b">MAVERICK</div>
-                <div className="magi-axis axis-c">ADVERSARY</div>
-              </div>
-              <h2>One answer. Four minds behind it.</h2>
-              <p>
-                Your request is drafted by the Architect, sharpened by the Maverick,
-                stress-tested by the Adversary, and forged into one deliverable by the Synthesis.
+              <p className="hero-kicker">Multi-model work engine</p>
+              <h2>One prompt. Four expert minds. One answer.</h2>
+              <p className="hero-sub">
+                MAGI routes your request through four specialists — each building on the last —
+                then hands back a single, polished result. No model-picking, no prompt-wrangling.
+              </p>
+              <ol className="hero-flow" aria-label="How MAGI works">
+                {heroRoles.map((role, index) => (
+                  <li key={role.name}>
+                    <span className="hero-step-num">{index + 1}</span>
+                    <strong>{role.name}</strong>
+                    <span>{role.desc}</span>
+                  </li>
+                ))}
+              </ol>
+              <p className="hero-hint">
+                Running on <strong>{modeInfo[mode].label}</strong> · {modeInfo[mode].models}
               </p>
             </div>
           )}
@@ -594,35 +612,41 @@ export default function Home() {
         </section>
 
         <form className="composer" onSubmit={submitPrompt}>
-          <label className="sr-only" htmlFor="modeSelect">
-            MAGI mode
-          </label>
-          <select
-            id="modeSelect"
-            value={mode}
-            onChange={(event) =>
-              setMode(event.target.value as "economy" | "standard" | "premium")
-            }
-            disabled={isRunning}
-          >
-            <option value="economy">Economy</option>
-            <option value="standard">Standard</option>
-            <option value="premium">Premium</option>
-          </select>
-          <label className="sr-only" htmlFor="promptInput">
-            Prompt
-          </label>
-          <textarea
-            id="promptInput"
-            rows={2}
-            placeholder="Enter directive for MAGI review..."
-            value={prompt}
-            onChange={(event) => setPrompt(event.target.value)}
-            disabled={isRunning}
-          />
-          <button type="submit" disabled={isRunning}>
-            {isRunning ? "Running" : "Decide"}
-          </button>
+          <div className="mode-cards" role="radiogroup" aria-label="MAGI tier">
+            {(Object.keys(modeInfo) as ModeKey[]).map((key) => (
+              <button
+                type="button"
+                key={key}
+                role="radio"
+                aria-checked={mode === key}
+                className={`mode-card ${mode === key ? "active" : ""}`}
+                onClick={() => setMode(key)}
+                disabled={isRunning}
+              >
+                <span className="mode-card-top">
+                  <strong>{modeInfo[key].label}</strong>
+                  <span className="mode-card-cost">{modeInfo[key].cost}</span>
+                </span>
+                <span className="mode-card-models">{modeInfo[key].models}</span>
+              </button>
+            ))}
+          </div>
+          <div className="composer-input">
+            <label className="sr-only" htmlFor="promptInput">
+              Prompt
+            </label>
+            <textarea
+              id="promptInput"
+              rows={2}
+              placeholder="Ask MAGI anything — a plan, a memo, an analysis, code…"
+              value={prompt}
+              onChange={(event) => setPrompt(event.target.value)}
+              disabled={isRunning}
+            />
+            <button type="submit" disabled={isRunning}>
+              {isRunning ? "Running" : "Decide"}
+            </button>
+          </div>
         </form>
       </section>
 
