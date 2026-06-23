@@ -13,254 +13,44 @@ export const skillPackPaths: Record<MagiNode, string> = {
   judge: "magi-skills/fact-judge-auditor/SKILL.md",
 };
 
+// Node keys are kept stable (melchior/balthasar/casper/judge) so model routing and skill
+// loading keep working, but each is now a PERSPECTIVE, not a pipeline stage:
+//   melchior  = The Architect (by the book)
+//   balthasar = The Maverick  (outside the box)
+//   casper    = The Adversary (red-team)
+//   judge     = The Synthesis (final integrator)
 export const magiSkills: Record<MagiNode, MagiSkill[]> = {
   melchior: [
-    {
-      id: "requirements-extraction",
-      label: "Requirements Extraction",
-      instruction:
-        "Extract explicit and implied requirements before drafting. Separate must-have requirements from nice-to-have details.",
-    },
-    {
-      id: "missing-step-detection",
-      label: "Missing-Step Detection",
-      instruction:
-        "Identify skipped reasoning, setup steps, dependencies, or decisions that would make the answer incomplete.",
-    },
-    {
-      id: "assumption-tracking",
-      label: "Assumption Tracking",
-      instruction:
-        "List assumptions that are necessary to proceed, and keep them conservative unless the user gave stronger evidence.",
-    },
-    {
-      id: "edge-case-discovery",
-      label: "Edge-Case Discovery",
-      instruction:
-        "Look for boundary cases, failure modes, unusual inputs, and cases where the proposed answer would break.",
-    },
-    {
-      id: "ambiguity-resolution",
-      label: "Ambiguity Resolution",
-      instruction:
-        "Resolve ambiguity with the most likely interpretation, and name any interpretation that would materially change the answer.",
-    },
-    {
-      id: "constraint-mapping",
-      label: "Constraint Mapping",
-      instruction:
-        "Map technical, product, timing, cost, safety, style, and user-specified constraints before proposing a path.",
-    },
-    {
-      id: "risk-identification",
-      label: "Risk Identification",
-      instruction:
-        "Call out risks that could make the answer wrong, expensive, slow, unsafe, or misaligned with the user goal.",
-    },
-    {
-      id: "architecture-critique",
-      label: "Architecture Critique",
-      instruction:
-        "Critique the structure of the solution: interfaces, dependencies, ownership boundaries, scalability, and maintainability.",
-    },
-    {
-      id: "root-cause-analysis",
-      label: "Root-Cause Analysis",
-      instruction:
-        "For bugs or failures, distinguish symptoms from root causes and avoid patching only the visible surface.",
-    },
-    {
-      id: "failure-analysis",
-      label: "Failure Analysis",
-      instruction:
-        "Ask what would make this fail in real use, then repair the answer around those failure points.",
-    },
+    { id: "requirements-extraction", label: "Requirements Extraction", instruction: "Surface every explicit and implied requirement before drafting; separate must-haves from nice-to-haves." },
+    { id: "structure-first", label: "Structure-First Drafting", instruction: "Lay out the complete skeleton — all required sections present — before filling detail." },
+    { id: "constraint-mapping", label: "Constraint Mapping", instruction: "Map every technical, cost, timing, scope, and user-stated constraint and honor each one." },
+    { id: "specificity-discipline", label: "Specificity Discipline", instruction: "Replace generalities with concrete numbers, names, and steps. No vague placeholders." },
+    { id: "completeness", label: "Completeness Enforcement", instruction: "Check that nothing the task asked for is silently dropped." },
+    { id: "soundness", label: "Soundness Check", instruction: "Verify each claim and step actually follows. No leaps." },
+    { id: "standard-practice", label: "Standard-Practice Grounding", instruction: "Anchor in how a competent professional in this field would actually do it." },
   ],
   balthasar: [
-    {
-      id: "final-answer-synthesis",
-      label: "Final Answer Synthesis",
-      instruction:
-        "Convert analysis into one coherent, user-facing answer with a clear recommendation and no visible internal debate.",
-    },
-    {
-      id: "code-file-generation",
-      label: "Code/File Generation",
-      instruction:
-        "When the task asks for build output, produce complete file-level artifacts with filenames, contents, and integration notes.",
-    },
-    {
-      id: "ui-generation",
-      label: "UI Generation",
-      instruction:
-        "For interface tasks, generate usable UI structure, responsive layout decisions, states, controls, and polished copy.",
-    },
-    {
-      id: "refactoring",
-      label: "Refactoring",
-      instruction:
-        "Improve implementation shape without unnecessary churn. Preserve behavior unless the user requested a behavior change.",
-    },
-    {
-      id: "implementation-planning",
-      label: "Implementation Planning",
-      instruction:
-        "Break the answer into practical build steps ordered by dependency, risk, and user value.",
-    },
-    {
-      id: "api-integration",
-      label: "API Integration",
-      instruction:
-        "Define server-only secrets, request/response contracts, error handling, rate limits, and provider fallback behavior.",
-    },
-    {
-      id: "product-copywriting",
-      label: "Product Copywriting",
-      instruction:
-        "Write concise product copy that communicates the offer clearly without hype or vague claims.",
-    },
-    {
-      id: "project-scaffolding",
-      label: "Project Scaffolding",
-      instruction:
-        "Create sensible project structure, dependency choices, scripts, and README guidance for generated apps or websites.",
-    },
-    {
-      id: "deployment-preparation",
-      label: "Deployment Preparation",
-      instruction:
-        "Include deploy-critical setup: env vars, build commands, output settings, runtime constraints, and verification steps.",
-    },
-    {
-      id: "usability-hardening",
-      label: "Usability Hardening",
-      instruction:
-        "Make the result actually usable: fill gaps, remove ambiguity, add defaults, and include a realistic next action.",
-    },
+    { id: "reframe-hunting", label: "Reframe Hunting", instruction: "Find the angle that recasts the whole problem — what is this really about?" },
+    { id: "contrarian-angle", label: "Contrarian Angle", instruction: "Identify where the obvious answer is shallow or wrong, and say so." },
+    { id: "differentiation", label: "Differentiation Injection", instruction: "Add the move that makes this stand out from what every competitor or generic AI would produce." },
+    { id: "analogy-transfer", label: "Analogy Transfer", instruction: "Import what works from a different domain or industry." },
+    { id: "assumption-inversion", label: "Assumption Inversion", instruction: "Flip a default assumption and see if the better answer lives on the other side." },
+    { id: "edge-voice", label: "Edge & Voice", instruction: "Give it a confident, specific, memorable point of view — not committee-speak." },
   ],
   casper: [
-    {
-      id: "intent-preservation",
-      label: "Intent Preservation",
-      instruction:
-        "Check whether the candidate answer preserves the original ask, priority, constraints, and implied desired outcome.",
-    },
-    {
-      id: "scope-creep-detection",
-      label: "Scope Creep Detection",
-      instruction:
-        "Flag additions that make the answer larger, slower, more expensive, or less focused than the user requested.",
-    },
-    {
-      id: "tone-style-matching",
-      label: "Tone/Style Matching",
-      instruction:
-        "Check whether the answer matches the user's requested tone, format, level of detail, and product personality.",
-    },
-    {
-      id: "constraint-enforcement",
-      label: "Constraint Enforcement",
-      instruction:
-        "Verify that user-stated constraints are followed exactly unless there is a clear reason to warn or refuse.",
-    },
-    {
-      id: "dramatic-change-detection",
-      label: "Dramatic-Change Detection",
-      instruction:
-        "Flag sudden direction changes, overcorrections, reframes, or substitutions that the user did not ask for.",
-    },
-    {
-      id: "actual-answer-check",
-      label: "Actual Answer Check",
-      instruction:
-        "Ask whether the candidate actually answers the user's question or merely talks around it.",
-    },
-    {
-      id: "ux-coherence-review",
-      label: "UX Coherence Review",
-      instruction:
-        "For product/UI answers, check workflow clarity, screen hierarchy, text fit, predictable controls, and user effort.",
-    },
-    {
-      id: "brand-consistency-review",
-      label: "Brand Consistency Review",
-      instruction:
-        "Check that naming, language, visual direction, and product claims remain consistent with MAGI's brand.",
-    },
-    {
-      id: "cost-speed-sanity",
-      label: "Cost/Speed Sanity",
-      instruction:
-        "Flag choices that unnecessarily increase latency, model spend, operational complexity, or user wait time.",
-    },
-    {
-      id: "user-trust-check",
-      label: "User Trust Check",
-      instruction:
-        "Flag behavior that would surprise the user, hide tradeoffs, overpromise, or make the system feel unreliable.",
-    },
+    { id: "objection-surfacing", label: "Objection Surfacing", instruction: "Name the hardest objection a smart skeptic would raise, then address it in the work." },
+    { id: "failure-mode-probing", label: "Failure-Mode Probing", instruction: "Ask what makes this fail in real use, and repair around those points." },
+    { id: "hype-removal", label: "Hype Removal", instruction: "Cut unsupported superlatives and replace them with defensible specifics." },
+    { id: "gap-filling", label: "Gap Filling", instruction: "Find what is conspicuously missing and add it." },
+    { id: "assumption-stress-test", label: "Assumption Stress-Test", instruction: "Pressure every load-bearing assumption; flag the ones that will not hold." },
+    { id: "risk-exposure", label: "Risk Exposure", instruction: "Make hidden trade-offs, costs, and risks explicit instead of buried." },
   ],
   judge: [
-    {
-      id: "factual-verification",
-      label: "Factual Verification",
-      instruction:
-        "Check factual claims for correctness, uncertainty, and whether they require current external verification.",
-    },
-    {
-      id: "logic-checking",
-      label: "Logic Checking",
-      instruction:
-        "Check whether the reasoning, sequence, math, and conclusions follow from the inputs.",
-    },
-    {
-      id: "build-test-interpretation",
-      label: "Build/Test Interpretation",
-      instruction:
-        "For engineering tasks, treat build/test results as primary evidence and flag unresolved failures.",
-    },
-    {
-      id: "security-review",
-      label: "Security Review",
-      instruction:
-        "Check for leaked secrets, unsafe auth assumptions, injection risks, permission issues, and abusive usage paths.",
-    },
-    {
-      id: "provider-compatibility",
-      label: "Provider Compatibility",
-      instruction:
-        "Check whether provider model names, env vars, API contracts, and fallback rules are compatible with the implementation.",
-    },
-    {
-      id: "pricing-cost-sanity",
-      label: "Pricing/Cost Sanity",
-      instruction:
-        "Check token, model, subscription, and infrastructure cost claims for plausibility and hidden margin risk.",
-    },
-    {
-      id: "citation-requirement",
-      label: "Citation Requirement Check",
-      instruction:
-        "Flag answers that need sources, links, dates, or evidence but provide none.",
-    },
-    {
-      id: "hallucination-detection",
-      label: "Hallucination Detection",
-      instruction:
-        "Flag invented facts, fake APIs, fake files, fake test results, or unsupported claims.",
-    },
-    {
-      id: "math-token-cost-validation",
-      label: "Math/Token/Cost Validation",
-      instruction:
-        "Recalculate numeric claims, token estimates, limits, rates, and pricing examples before passing the answer.",
-    },
-    {
-      id: "runtime-verification",
-      label: "Runtime Verification",
-      instruction:
-        "Check whether the proposed answer can actually run in the target environment and names any missing runtime requirement.",
-    },
+    { id: "layer-integration", label: "Layer Integration", instruction: "Weave rigor, edge, and robustness into one piece, not three stapled together." },
+    { id: "contradiction-resolution", label: "Contradiction Resolution", instruction: "Where the prior voices disagree, decide in favor of the user's actual goal." },
+    { id: "edge-preservation", label: "Edge Preservation", instruction: "Protect the Maverick's sharp moves from being sanded down into a gray median." },
+    { id: "coherence", label: "Coherence Pass", instruction: "Make it read as one confident author, with no seams." },
+    { id: "final-polish", label: "Final Polish", instruction: "Clean structure, clean prose, ready to hand over." },
   ],
 };
 

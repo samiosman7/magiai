@@ -4,26 +4,47 @@ import { hasProviderKeys } from "./provider-keys";
 type NodeName = "direct" | "melchior" | "balthasar" | "casper" | "judge";
 
 const plans: Record<MagiMode, Record<NodeName, Pick<ModelCall, "provider" | "model">>> = {
+  // CHEAP BUILD + SMART VERIFY — the "minimum expensive model" thesis.
+  // Cheap models diagnose and build; Sonnet verifies (and fixes via the correction loop).
+  // Question: does a cheap builder with a smart checker match a single Sonnet, for less money?
+  benchmark: {
+    direct: { provider: "vercel", model: "deepseek/deepseek-v3" },
+    melchior: { provider: "vercel", model: "deepseek/deepseek-r1" },
+    balthasar: { provider: "vercel", model: "deepseek/deepseek-v3" },
+    casper: { provider: "vercel", model: "anthropic/claude-sonnet-4.5" },
+    judge: { provider: "vercel", model: "anthropic/claude-sonnet-4.5" },
+  },
+  // Sonnet in every slot — architecture ceiling, all via Vercel AI Gateway
+  "benchmark-max": {
+    direct: { provider: "vercel", model: "anthropic/claude-sonnet-4.5" },
+    melchior: { provider: "vercel", model: "anthropic/claude-sonnet-4.5" },
+    balthasar: { provider: "vercel", model: "anthropic/claude-sonnet-4.5" },
+    casper: { provider: "vercel", model: "anthropic/claude-sonnet-4.5" },
+    judge: { provider: "vercel", model: "anthropic/claude-sonnet-4.5" },
+  },
+  // Nodes are the angle roles: melchior=Architect, balthasar=Maverick, casper=Adversary, judge=Synthesis.
+  // economy + standard run the validated all-cheap chain (DeepSeek via the gateway).
   economy: {
-    direct: { provider: "google", model: "gemini-2.5-flash" },
-    melchior: { provider: "deepseek", model: "deepseek-chat" },
-    balthasar: { provider: "qwen", model: "qwen-plus" },
-    casper: { provider: "google", model: "gemini-2.5-flash" },
-    judge: { provider: "deepseek", model: "deepseek-chat" },
+    direct: { provider: "vercel", model: "deepseek/deepseek-v3" },
+    melchior: { provider: "vercel", model: "deepseek/deepseek-v3" },
+    balthasar: { provider: "vercel", model: "deepseek/deepseek-v3" },
+    casper: { provider: "vercel", model: "deepseek/deepseek-v3" },
+    judge: { provider: "vercel", model: "deepseek/deepseek-v3" },
   },
   standard: {
-    direct: { provider: "google", model: "gemini-2.5-flash" },
-    melchior: { provider: "google", model: "gemini-2.5-flash" },
-    balthasar: { provider: "openai", model: "gpt-4o-mini" },
-    casper: { provider: "anthropic", model: "claude-3-5-haiku-latest" },
-    judge: { provider: "google", model: "gemini-2.5-flash" },
+    direct: { provider: "vercel", model: "deepseek/deepseek-v3" },
+    melchior: { provider: "vercel", model: "deepseek/deepseek-v3" },
+    balthasar: { provider: "vercel", model: "deepseek/deepseek-v3" },
+    casper: { provider: "vercel", model: "deepseek/deepseek-v3" },
+    judge: { provider: "vercel", model: "deepseek/deepseek-v3" },
   },
+  // premium runs the same angle chain on Sonnet 4.6 (the quality ceiling).
   premium: {
-    direct: { provider: "google", model: "gemini-2.5-flash" },
-    melchior: { provider: "anthropic", model: "claude-3-5-sonnet-latest" },
-    balthasar: { provider: "openai", model: "gpt-4o" },
-    casper: { provider: "google", model: "gemini-2.5-pro" },
-    judge: { provider: "anthropic", model: "claude-3-5-sonnet-latest" },
+    direct: { provider: "vercel", model: "anthropic/claude-sonnet-4.6" },
+    melchior: { provider: "vercel", model: "anthropic/claude-sonnet-4.6" },
+    balthasar: { provider: "vercel", model: "anthropic/claude-sonnet-4.6" },
+    casper: { provider: "vercel", model: "anthropic/claude-sonnet-4.6" },
+    judge: { provider: "vercel", model: "anthropic/claude-sonnet-4.6" },
   },
 };
 

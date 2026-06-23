@@ -1,4 +1,4 @@
-export type MagiMode = "economy" | "standard" | "premium";
+export type MagiMode = "economy" | "standard" | "premium" | "benchmark" | "benchmark-max";
 
 export type GeminiModel =
   | "gemini-3.1-pro-preview"
@@ -27,7 +27,7 @@ export type PipelineStep =
   | "judge"
   | "final";
 
-export type ProviderName = "openai" | "anthropic" | "google" | "deepseek" | "qwen" | "mock";
+export type ProviderName = "openai" | "anthropic" | "google" | "deepseek" | "qwen" | "openrouter" | "vercel" | "mock";
 
 export type ModelCall = {
   provider: ProviderName;

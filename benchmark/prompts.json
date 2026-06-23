@@ -1,0 +1,73 @@
+{
+  "note": "ARENA set — complex multi-constraint tasks. Each prompt bakes in ~10 explicit, checkable requirements. The hypothesis: a single pass drops some requirements under load, while the pipeline (diagnose -> build -> verify) catches the drops. Scored by score.ts, which counts how many requirements each arm satisfied. `requirements` is the grading checklist; it is NOT sent separately (the asks are already in the prompt). Easy set in prompts-easy.json, hard single-shot set was the prior prompts.json.",
+  "prompts": [
+    {
+      "id": "a01-api-endpoint",
+      "kind": "coding",
+      "prompt": "Write a Node.js/Express POST /api/users endpoint (with any helpers it needs). It must: validate email format; require the password to be at least 12 characters; reject duplicate emails with HTTP 409; hash the password with bcrypt before storing; return 201 with the new user's id but never return the password; rate-limit to 5 requests per minute per IP; return 400 if the request body is missing or not valid JSON; trim and lowercase the email before storing; return 422 with field-level error messages on validation failure; and log every attempt with a timestamp while redacting the password from the log. Give complete, runnable code.",
+      "requirements": [
+        "Validates email format",
+        "Requires password length >= 12",
+        "Rejects duplicate email with HTTP 409",
+        "Hashes password with bcrypt before storing",
+        "Returns 201 with user id and never returns the password",
+        "Rate-limits to 5 requests/min per IP",
+        "Returns 400 on missing/invalid JSON body",
+        "Trims AND lowercases the email before storing",
+        "Returns 422 with field-level errors on validation failure",
+        "Logs each attempt with a timestamp AND redacts the password"
+      ]
+    },
+    {
+      "id": "a02-incident-runbook",
+      "kind": "writing",
+      "prompt": "Write a concise but complete security incident response runbook for a ransomware attack on a mid-size company. It must include all of the following: concrete detection indicators; immediate containment steps; a communication plan that names who to notify and when; evidence-preservation steps to take BEFORE remediation; a decision framework for whether to pay the ransom; a recovery/restore procedure; a post-incident review process; explicit roles and responsibilities (a RACI or equivalent); legal/regulatory notification requirements with timeframes; and an explicit section on what NOT to do during the incident.",
+      "requirements": [
+        "Concrete detection indicators",
+        "Immediate containment steps",
+        "Communication plan naming who to notify and when",
+        "Evidence-preservation steps explicitly BEFORE remediation",
+        "Decision framework for whether to pay ransom",
+        "Recovery/restore procedure",
+        "Post-incident review process",
+        "Explicit roles and responsibilities (RACI or equivalent)",
+        "Legal/regulatory notification requirements WITH timeframes",
+        "Explicit section on what NOT to do"
+      ]
+    },
+    {
+      "id": "a03-ci-workflow",
+      "kind": "coding",
+      "prompt": "Generate a single valid GitHub Actions CI workflow YAML file. It must: trigger on push to main and on pull requests; run on ubuntu-latest; use Node.js 20; cache npm dependencies; run lint, then tests, then build as separate steps; fail fast so build does not run if lint fails; run a deploy job ONLY when on the main branch AND after tests pass; use a matrix to also test on Node.js 18; set a 10-minute timeout per job; and upload the build output as artifacts. Output only the YAML.",
+      "requirements": [
+        "Triggers on push to main",
+        "Triggers on pull requests",
+        "Runs on ubuntu-latest",
+        "Uses Node.js 20",
+        "Caches npm dependencies",
+        "Runs lint, tests, build as separate ordered steps",
+        "Build does not run if lint fails (fail-fast ordering)",
+        "Deploy job gated on main branch AND tests passing",
+        "Matrix also tests Node.js 18",
+        "10-minute per-job timeout AND uploads build artifacts"
+      ]
+    },
+    {
+      "id": "a04-launch-plan",
+      "kind": "analysis",
+      "prompt": "Create a 6-week launch plan for a paid email newsletter. It must respect all of these constraints: a total budget cap of $2,000; at least 3 distinct acquisition channels; a specific weekly content cadence; a pricing experiment with exactly 2 tiers; a measurable success metric for each of the 6 weeks; a concrete churn-reduction tactic; identification of the single biggest risk plus a mitigation; an explicit statement of what to cut if you fall behind schedule; a pre-launch list-building phase before week 1; and CAN-SPAM compliance (a working unsubscribe mechanism and clear sender identity).",
+      "requirements": [
+        "Total budget stays within $2,000 cap (with numbers)",
+        "At least 3 distinct acquisition channels",
+        "Specific weekly content cadence",
+        "Pricing experiment with exactly 2 tiers",
+        "A measurable success metric for each of the 6 weeks",
+        "A concrete churn-reduction tactic",
+        "Single biggest risk identified WITH a mitigation",
+        "Explicit statement of what to cut if behind schedule",
+        "Pre-launch list-building phase before week 1",
+        "CAN-SPAM compliance: unsubscribe mechanism AND sender identity"
+      ]
+    }
+  ]
+}

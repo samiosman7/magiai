@@ -1,0 +1,25 @@
+{
+  "note": "Open-ended deliverable prompts — no objective answer. For the blind subjective judging website. These are the kind of work MAGI actually produces (plans, memos, positioning, campaigns, narratives).",
+  "prompts": [
+    {
+      "id": "s01-launch-plan",
+      "prompt": "Create a go-to-market launch plan for a new AI-powered personal finance app aimed at college students. Cover positioning, the first three acquisition channels, a rough 8-week timeline, the key risk, and how you'd measure early success. Be specific and concrete."
+    },
+    {
+      "id": "s02-strategy-memo",
+      "prompt": "Write a strategic memo to the CEO of a mid-size regional bookstore chain (12 stores) facing a steady decline in foot traffic. Recommend a clear direction, justify it, name the main trade-offs, and outline the first moves for the next 90 days."
+    },
+    {
+      "id": "s03-positioning",
+      "prompt": "Write a positioning analysis for a new premium oat-milk brand entering a crowded market dominated by two big incumbents. Define the target customer, the core differentiation, the brand's one-sentence positioning statement, and why it can win."
+    },
+    {
+      "id": "s04-cold-campaign",
+      "prompt": "Design a 4-email cold outreach campaign for a B2B startup selling automated invoicing software to small accounting firms (5-30 employees). Give the goal and a full draft of each email, escalating appropriately, each under 130 words. Keep it specific and human, not salesy."
+    },
+    {
+      "id": "s05-product-vision",
+      "prompt": "Write a compelling product vision narrative for a smart water bottle that helps people build a lasting hydration habit. Capture the user's real problem, the emotional payoff, how the product works day-to-day, and why it's different from just 'a bottle with an app'."
+    }
+  ]
+}

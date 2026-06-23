@@ -7,7 +7,7 @@ import { checkRateLimit, rateLimitResponse } from "@/lib/security/rate-limit";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const validModes = new Set(["economy", "standard", "premium"]);
+const validModes = new Set(["economy", "standard", "premium", "benchmark"]);
 const validGeminiModels = new Set([
   "gemini-3.1-pro-preview",
   "gemini-3.1-flash-lite-preview",

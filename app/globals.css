@@ -1,25 +1,25 @@
 :root {
   color-scheme: dark;
-  --bg: #030100;
-  --bg-2: #080302;
-  --panel: rgba(13, 4, 3, 0.94);
-  --panel-strong: #160604;
-  --panel-soft: rgba(255, 255, 255, 0.045);
-  --line: rgba(255, 66, 32, 0.34);
-  --line-strong: rgba(255, 93, 35, 0.58);
-  --red: #ff1010;
-  --red-dark: #8b0000;
-  --orange: #ff6a00;
-  --amber: #ffd21f;
-  --green: #27ff9a;
-  --cyan: #26ffd2;
-  --blue: #73c7ff;
-  --text: #ffe8c2;
-  --muted: #c58d62;
-  --dim: #7c4b36;
-  --shadow: rgba(0, 0, 0, 0.55);
-  font-family:
-    "Arial Narrow", "Roboto Condensed", "Impact", "Segoe UI", Arial, sans-serif;
+  --bg: #0a0b0d;
+  --bg-2: #0f1113;
+  --panel: #14161a;
+  --panel-strong: #181b20;
+  --panel-soft: rgba(255, 255, 255, 0.04);
+  --line: rgba(255, 255, 255, 0.09);
+  --line-strong: rgba(255, 255, 255, 0.16);
+  /* NERV accent — used sparingly */
+  --red: #ff5b2e;
+  --red-dark: #c2401d;
+  --orange: #ff7a33;
+  --amber: #d8b072;
+  --green: #34d399;
+  --cyan: #5fb0c9;
+  --blue: #7db4ff;
+  --text: #e8eaed;
+  --muted: #9aa3ad;
+  --dim: #6b7280;
+  --shadow: rgba(0, 0, 0, 0.5);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
 * {
@@ -35,41 +35,14 @@ body {
   margin: 0;
   min-height: 100vh;
   background:
-    radial-gradient(circle at 50% 22%, rgba(255, 30, 0, 0.32), transparent 34rem),
-    radial-gradient(circle at 78% 12%, rgba(39, 255, 154, 0.12), transparent 22rem),
-    linear-gradient(115deg, rgba(255, 16, 16, 0.3), transparent 32%),
-    linear-gradient(245deg, rgba(255, 106, 0, 0.12), transparent 28%),
-    linear-gradient(180deg, #170403 0%, #070100 52%, #020000 100%);
+    radial-gradient(circle at 50% -10%, rgba(255, 91, 46, 0.06), transparent 40rem),
+    var(--bg);
   color: var(--text);
 }
 
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background:
-    linear-gradient(rgba(39, 255, 154, 0.12) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 16, 16, 0.12) 1px, transparent 1px),
-    repeating-linear-gradient(0deg, transparent 0 6px, rgba(255, 106, 0, 0.04) 6px 7px);
-  background-size: 100% 22px, 22px 100%, 100% 7px;
-  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.8), transparent 82%);
-}
-
+body::before,
 body::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background:
-    repeating-linear-gradient(
-      45deg,
-      transparent 0,
-      transparent 38px,
-      rgba(255, 16, 16, 0.18) 38px,
-      rgba(255, 16, 16, 0.18) 44px
-    );
-  opacity: 0.18;
+  content: none;
 }
 
 button,
@@ -1010,7 +983,183 @@ select:disabled {
     font-size: clamp(2.1rem, 13vw, 4.1rem);
   }
 }
-  color: var(--red);
-  text-shadow:
-    2px 2px 0 #090000,
-    0 0 28px rgba(255, 16, 16, 0.7);
+
+/* ============================================================
+   RESTRAINT PASS — NERV-inspired, toned down. These rules are
+   appended last so they win the cascade over the heavy originals.
+   ============================================================ */
+.shell {
+  gap: 16px;
+  padding: 20px;
+}
+
+.workspace,
+.dossier {
+  border: 1px solid var(--line);
+  border-top: 2px solid var(--red);
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: 0 10px 40px var(--shadow);
+  backdrop-filter: none;
+  clip-path: none;
+}
+.workspace::before,
+.dossier::before {
+  content: none;
+}
+
+.topbar,
+.panel-head {
+  align-items: center;
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-2);
+  background-size: auto;
+}
+
+.brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.brand-lockup > div { display: block; }
+
+.nerv-mark {
+  display: grid;
+  place-items: center;
+  width: auto;
+  min-height: 0;
+  padding: 6px 12px;
+  border-radius: 7px;
+  background: var(--red);
+  color: #16100c;
+  font-size: 0.85rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  clip-path: none;
+  text-shadow: none;
+  box-shadow: none;
+}
+
+.kicker {
+  color: var(--muted);
+  font-family: ui-monospace, "SF Mono", Consolas, monospace;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+}
+
+h1 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0;
+  text-transform: none;
+  text-shadow: none;
+}
+.panel-head h2,
+.node-card summary {
+  font-size: 0.92rem;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 650;
+}
+
+.signal,
+.auth-station {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  box-shadow: none;
+}
+.signal {
+  color: var(--muted);
+  font-family: ui-monospace, "SF Mono", Consolas, monospace;
+  font-size: 0.74rem;
+  font-weight: 600;
+  text-transform: none;
+  box-shadow: none;
+}
+.signal span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 8px rgba(52, 211, 153, 0.5);
+}
+.auth-station { flex-direction: column; align-items: flex-start; min-width: 0; gap: 1px; }
+.auth-station small { color: var(--muted); font-weight: 600; }
+.auth-station strong { color: var(--text); }
+
+/* hero */
+.empty-state h2 {
+  font-size: clamp(1.6rem, 3.4vw, 2.4rem);
+  font-weight: 750;
+  line-height: 1.18;
+  text-transform: none;
+}
+.empty-state p { color: var(--muted); }
+
+/* the three-ring mark — calm, low-contrast */
+.magi-ring { border-color: var(--line-strong) !important; box-shadow: none !important; opacity: 0.5; }
+.magi-core { color: var(--red) !important; text-shadow: none !important; box-shadow: 0 0 0 1px var(--line) inset !important; background: var(--panel-strong) !important; }
+.magi-core strong { color: var(--text) !important; }
+.magi-axis { color: var(--muted) !important; text-shadow: none !important; font-weight: 600; letter-spacing: 0.12em; }
+
+/* messages */
+.message {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-strong);
+  box-shadow: none;
+  text-shadow: none;
+}
+.message.user { border-left: 2px solid var(--red); }
+.message.magi { border-left: 2px solid var(--blue); }
+.message.status { background: transparent; border: 0; color: var(--muted); font-size: 0.85rem; }
+
+/* pipeline trace */
+.pipeline li { color: var(--muted); text-transform: none; letter-spacing: 0; }
+.pipeline li span { border-color: var(--line-strong); background: transparent; box-shadow: none; }
+.pipeline li.active { color: var(--text); }
+.pipeline li.active span { background: var(--red); box-shadow: 0 0 8px rgba(255, 91, 46, 0.5); }
+.pipeline li.done span { background: var(--green); box-shadow: none; }
+
+/* composer + controls */
+.composer { border-top: 1px solid var(--line); background: var(--bg-2); }
+.composer textarea,
+.composer select {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  color: var(--text);
+  text-transform: none;
+}
+.composer button {
+  border: 0;
+  border-radius: 8px;
+  background: var(--red);
+  color: #16100c;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  box-shadow: none;
+}
+.composer button:disabled { opacity: 0.5; }
+
+.node-card {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-strong);
+}
+.download-button,
+.artifact-action,
+.ghost {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  text-transform: none;
+  box-shadow: none;
+}
+.download-button { background: var(--red); color: #16100c; border: 0; font-weight: 700; }

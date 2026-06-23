@@ -21,6 +21,8 @@ const creditCostByMode: Record<MagiMode, number> = {
   economy: 0.5,
   standard: 1,
   premium: 3,
+  benchmark: 0,
+  "benchmark-max": 0,
 };
 
 export function estimateCredits(mode: MagiMode, prompt: string) {

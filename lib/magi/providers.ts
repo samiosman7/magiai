@@ -9,10 +9,27 @@ export async function generateText(call: ModelCall): Promise<ModelResult> {
   if (call.provider === "openai") return openAiCompatible(call, process.env.OPENAI_API_KEY, "https://api.openai.com/v1/chat/completions");
   if (call.provider === "deepseek") return openAiCompatible(call, process.env.DEEPSEEK_API_KEY, "https://api.deepseek.com/chat/completions");
   if (call.provider === "qwen") return openAiCompatible(call, process.env.QWEN_API_KEY, "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions");
+  if (call.provider === "openrouter") return openRouter(call);
+  if (call.provider === "vercel") return openAiCompatible(call, process.env.AI_GATEWAY_API_KEY, "https://ai-gateway.vercel.sh/v1/chat/completions");
   if (call.provider === "anthropic") return anthropic(call);
   if (call.provider === "google") return google(call);
 
   return mockGenerate(call);
+}
+
+// Retries transient rate-limit (429) and server (5xx) responses with exponential backoff.
+async function fetchWithRetry(url: string, init: RequestInit, attempts = 5): Promise<Response> {
+  let delay = 800;
+  for (let i = 0; i < attempts; i++) {
+    const response = await fetch(url, init);
+    if (response.status !== 429 && response.status < 500) return response;
+    if (i === attempts - 1) return response;
+    const retryAfter = Number(response.headers.get("retry-after"));
+    const waitMs = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : delay;
+    await new Promise((resolve) => setTimeout(resolve, waitMs));
+    delay = Math.min(delay * 2, 8000);
+  }
+  return fetch(url, init);
 }
 
 async function openAiCompatible(
@@ -22,7 +39,7 @@ async function openAiCompatible(
 ): Promise<ModelResult> {
   if (!apiKey) return mockGenerate(call);
 
-  const response = await fetch(url, {
+  const response = await fetchWithRetry(url, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -40,7 +57,48 @@ async function openAiCompatible(
   });
 
   if (!response.ok) {
-    throw new Error(`${call.provider} returned ${response.status}`);
+    const body = await response.text().catch(() => "");
+    throw new Error(`${call.provider} returned ${response.status}${body ? `: ${body.slice(0, 180)}` : ""}`);
+  }
+
+  const data = (await response.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+
+  return {
+    text: data.choices?.[0]?.message?.content?.trim() || "",
+    provider: call.provider,
+    model: call.model,
+    isMock: false,
+  };
+}
+
+async function openRouter(call: ModelCall): Promise<ModelResult> {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) return mockGenerate(call);
+
+  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": "https://magiai123.vercel.app",
+      "X-Title": "MAGI",
+    },
+    body: JSON.stringify({
+      model: call.model,
+      messages: [
+        { role: "system", content: call.system },
+        { role: "user", content: call.prompt },
+      ],
+      max_tokens: call.maxTokens ?? 900,
+      temperature: call.temperature ?? 0.25,
+    }),
+  });
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    throw new Error(`openrouter returned ${response.status}${body ? `: ${body.slice(0, 180)}` : ""}`);
   }
 
   const data = (await response.json()) as {

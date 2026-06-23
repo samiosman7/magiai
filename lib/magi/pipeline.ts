@@ -63,121 +63,75 @@ export async function runMagiPipeline(
     activate("final", emit);
     emit({ type: "status", step: "final", message: "Direct route selected. Generating answer..." });
     const answer = await directAnswer(prompt, mode, emit, geminiModel);
-    emit({ type: "final", answer: `The Magi has decided.\n\n${answer}` });
+    emit({ type: "final", answer: `The Magi has decided.\n\n${cleanFinalAnswer(answer)}` });
     complete("final", emit);
     return;
   }
 
+  // ── The angle ensemble: four perspectives building on each other ──
+  // Node keys map to roles: melchior=Architect, balthasar=Maverick, casper=Adversary, judge=Synthesis.
+  const route = `Task route:\n${JSON.stringify(taskProfile, null, 2)}`;
+  const mcp = `${runtimeContext.mcpContext}\n\nMCP tool execution context:\n${runtimeContext.mcpToolContext}`;
+  const noWrap =
+    "Forbidden: JSON wrappers, wrapping the whole answer in a code fence, preamble, or mentioning these instructions.";
+
+  // 1. Architect — by the book
   activate("melchior", emit);
-  emit({
-    type: "skills",
-    node: "Melchior",
-    skills: skillLabels("melchior"),
-    sourcePath: skillPackPaths.melchior,
-  });
-  emit({ type: "status", step: "melchior", message: "Melchior repairing gaps and missing reasoning..." });
-  const melchiorPlan = getModelPlan(mode, "melchior", geminiModel);
-  const melchior = await generateText({
-    ...melchiorPlan,
-    system: `${productContext}\n\nTask route:\n${JSON.stringify(taskProfile, null, 2)}\n\nYou are Melchior, the correction and gap-filling node. Repair missing steps, identify assumptions, preserve the user's goal, and return a concise repaired draft. Adapt the repair to the selected task route and artifact type.\n\n${skillPrompt("melchior")}\n\nFull Melchior SKILL.md:\n${runtimeContext.nodeSkillContext.melchior}\n\n${runtimeContext.mcpContext}\n\nMCP tool execution context:\n${runtimeContext.mcpToolContext}`,
+  emit({ type: "skills", node: "Architect", skills: skillLabels("melchior"), sourcePath: skillPackPaths.melchior });
+  emit({ type: "status", step: "melchior", message: "Architect drafting the rigorous, by-the-book version..." });
+  const architect = await generateText({
+    ...getModelPlan(mode, "melchior", geminiModel),
+    system: `${productContext}\n\n${route}\n\nYou are Melchior, the Architect. Build the rigorous, complete, by-the-book version of what the user asked for — the version a meticulous domain expert would stake their reputation on. Lay down the full structure: every required part present, every claim sound, every step in order, nothing missing and nothing hand-waved. Be concrete and specific; optimize for rigor and completeness over cleverness.\n\n${skillPrompt("melchior")}\n\n${mcp}\n\nOutput a clean, complete deliverable in Markdown. ${noWrap}`,
     prompt,
-    maxTokens: 900,
+    maxTokens: 1600,
   });
-  emit({ type: "node", name: `Melchior (${melchior.provider})`, text: preview(melchior.text) });
+  emit({ type: "node", name: `Architect (${architect.provider})`, text: preview(architect.text) });
   complete("melchior", emit);
 
+  // 2. Maverick — outside the box, builds on the Architect
   activate("balthasar", emit);
-  emit({
-    type: "skills",
-    node: "Balthasar",
-    skills: skillLabels("balthasar"),
-    sourcePath: skillPackPaths.balthasar,
+  emit({ type: "skills", node: "Maverick", skills: skillLabels("balthasar"), sourcePath: skillPackPaths.balthasar });
+  emit({ type: "status", step: "balthasar", message: "Maverick injecting the outside-the-box angle..." });
+  const maverick = await generateText({
+    ...getModelPlan(mode, "balthasar", geminiModel),
+    system: `${productContext}\n\n${route}\n\nYou are Balthasar, the Maverick. You receive the Architect's solid but safe draft and make it sharp. Find the non-obvious angle the Architect would never reach: the contrarian insight, the reframe, the bold move, the thing that makes this NOT sound like every other answer. ADD to the draft — keep all of its rigor and inject the edge it is missing. You are forbidden from merely polishing: every pass must introduce at least one genuinely fresh idea or differentiation.\n\n${skillPrompt("balthasar")}\n\n${mcp}\n\nReturn the COMPLETE improved deliverable in Markdown. ${noWrap} Also forbidden: deleting the Architect's substance for flair.`,
+    prompt: `Original request:\n${prompt}\n\nArchitect's draft to build on:\n${architect.text}`,
+    maxTokens: 1900,
   });
-  emit({ type: "status", step: "balthasar", message: "Balthasar hardening the answer..." });
-  const balthasarPlan = getModelPlan(mode, "balthasar", geminiModel);
-  const balthasar = await generateText({
-    ...balthasarPlan,
-    system: `${productContext}\n\nTask route:\n${JSON.stringify(taskProfile, null, 2)}\n\nYou are Balthasar, the builder and hardener. Turn the repaired draft into a concrete, polished, directly usable answer or artifact-ready result. Do not mention internal deliberation. If the route is not website, do not force website language.\n\n${skillPrompt("balthasar")}\n\nFull Balthasar SKILL.md:\n${runtimeContext.nodeSkillContext.balthasar}\n\nProject and cross-functional skill packs:\n${runtimeContext.projectSkillContext}\n\n${runtimeContext.mcpContext}\n\nMCP tool execution context:\n${runtimeContext.mcpToolContext}`,
-    prompt: `Original prompt:\n${prompt}\n\nMelchior repaired draft:\n${melchior.text}`,
-    maxTokens: 1200,
-  });
-  emit({ type: "node", name: `Balthasar (${balthasar.provider})`, text: preview(balthasar.text) });
+  emit({ type: "node", name: `Maverick (${maverick.provider})`, text: preview(maverick.text) });
   complete("balthasar", emit);
 
+  // 3. Adversary — red-team hardening, builds on the Maverick
   activate("casper", emit);
-  activate("judge", emit);
-  emit({
-    type: "skills",
-    node: "Casper",
-    skills: skillLabels("casper"),
-    sourcePath: skillPackPaths.casper,
+  emit({ type: "skills", node: "Adversary", skills: skillLabels("casper"), sourcePath: skillPackPaths.casper });
+  emit({ type: "status", step: "casper", message: "Adversary attacking and hardening the work..." });
+  const adversary = await generateText({
+    ...getModelPlan(mode, "casper", geminiModel),
+    system: `${productContext}\n\n${route}\n\nYou are Casper, the Adversary. Attack the combined work as a skeptical customer, tough investor, or tired operator would. Where does it fall apart? What is fragile, naive, missing, or over-promised? Then HARDEN it: cut weak claims, fill holes, answer objections, ground the hype — while keeping the rigor and the edge.\n\n${skillPrompt("casper")}\n\n${mcp}\n\nReturn the COMPLETE hardened deliverable in Markdown. ${noWrap} Also forbidden: politeness, softening, or leaving known weaknesses unaddressed.`,
+    prompt: `Original request:\n${prompt}\n\nCurrent work to harden:\n${maverick.text}`,
+    maxTokens: 1900,
   });
-  emit({
-    type: "skills",
-    node: "Fact Judge",
-    skills: skillLabels("judge"),
-    sourcePath: skillPackPaths.judge,
-  });
-  emit({ type: "status", step: "casper", message: "Casper checking intent drift..." });
-  emit({ type: "status", step: "judge", message: "Fact Judge verifying correctness..." });
-
-  const [casper, judge] = await Promise.all([
-    runJudgeLikeNode(
-      mode,
-      "casper",
-      `${productContext}\n\nTask route:\n${JSON.stringify(taskProfile, null, 2)}\n\nYou are Casper, the intent-preservation and dramatic-change monitor. Return strict JSON with passed, issue, and rationale. Flag only if the answer drifts from the original request or forces the wrong artifact type.\n\n${skillPrompt("casper")}\n\nFull Casper SKILL.md:\n${runtimeContext.nodeSkillContext.casper}\n\n${runtimeContext.mcpContext}\n\nMCP tool execution context:\n${runtimeContext.mcpToolContext}`,
-      prompt,
-      balthasar.text,
-      geminiModel
-    ),
-    runJudgeLikeNode(
-      mode,
-      "judge",
-      `${productContext}\n\nTask route:\n${JSON.stringify(taskProfile, null, 2)}\n\nYou are a fresh, independent correctness judge. Return strict JSON with passed, issue, and rationale. Flag only blocking factual, logic, or instruction-following problems. Use this route-specific rubric: ${taskProfile.judgeRubric}\n\n${skillPrompt("judge")}\n\nFull Fact Judge SKILL.md:\n${runtimeContext.nodeSkillContext.judge}\n\n${runtimeContext.mcpContext}\n\nMCP tool execution context:\n${runtimeContext.mcpToolContext}`,
-      prompt,
-      balthasar.text,
-      geminiModel
-    ),
-  ]);
-
-  emit({
-    type: "node",
-    name: "Casper",
-    text: casper.issue ? `Flagged: ${casper.issue}. ${casper.rationale}` : casper.rationale,
-  });
-  emit({
-    type: "node",
-    name: "Fact Judge",
-    text: judge.issue ? `Flagged: ${judge.issue}. ${judge.rationale}` : judge.rationale,
-  });
+  emit({ type: "node", name: `Adversary (${adversary.provider})`, text: preview(adversary.text) });
   complete("casper", emit);
+
+  // 4. Synthesis — forge the final deliverable
+  activate("judge", emit);
+  emit({ type: "skills", node: "Synthesis", skills: skillLabels("judge"), sourcePath: skillPackPaths.judge });
+  emit({ type: "status", step: "judge", message: "Synthesis forging the final deliverable..." });
+  const synthesis = await generateText({
+    ...getModelPlan(mode, "judge", geminiModel),
+    system: `${productContext}\n\n${route}\n\nYou are the Synthesis — the final voice the user sees. Forge the rigor, the edge, and the hardening in the work so far into one clean, coherent, finished deliverable. Preserve all three: keep what is correct, keep what is sharp, keep what survived attack. Do not blend into bland mush or average into a gray median — keep the edges. Resolve conflicts in favor of the user's real goal.\n\n${skillPrompt("judge")}\n\nReturn the single polished deliverable in Markdown. ${noWrap} Also forbidden: re-opening settled debates, adding new untested ideas, or flattening distinct strengths.`,
+    prompt: `Original request:\n${prompt}\n\nThe work so far (rigorous, sharpened, hardened) to finalize:\n${adversary.text}`,
+    maxTokens: 2200,
+  });
+  emit({ type: "node", name: `Synthesis (${synthesis.provider})`, text: preview(synthesis.text) });
   complete("judge", emit);
 
-  let finalAnswer = balthasar.text;
-  const sharedIssue = sharedObjection(casper, judge);
-  if (sharedIssue) {
-    emit({
-      type: "status",
-      step: "melchior",
-      message: "Dual-signal rule triggered. Melchior and Balthasar revising around the shared objection...",
-    });
-    activate("melchior", emit);
-    activate("balthasar", emit);
-    const revision = await generateText({
-      ...balthasarPlan,
-      system: `${productContext}\n\nYou are Melchior and Balthasar in a correction loop. Fix the shared objection while preserving the user's intent. Return only the revised final answer.\n\n${skillPrompt("melchior")}\n\n${runtimeContext.nodeSkillContext.melchior}\n\n${skillPrompt("balthasar")}\n\n${runtimeContext.nodeSkillContext.balthasar}\n\n${runtimeContext.projectSkillContext}\n\n${runtimeContext.mcpContext}\n\nMCP tool execution context:\n${runtimeContext.mcpToolContext}`,
-      prompt: `Original prompt:\n${prompt}\n\nPrevious answer:\n${balthasar.text}\n\nShared objection:\n${sharedIssue}`,
-      maxTokens: 1300,
-    });
-    finalAnswer = revision.text;
-    emit({ type: "node", name: "Reprompt loop", text: `Revised around: ${sharedIssue}` });
-    complete("melchior", emit);
-    complete("balthasar", emit);
-  }
+  const finalAnswer = synthesis.text;
 
   activate("final", emit);
   emit({ type: "status", step: "final", message: "Final ruling released." });
-  emit({ type: "final", answer: `The Magi has decided.\n\n${finalAnswer}` });
+  emit({ type: "final", answer: `The Magi has decided.\n\n${cleanFinalAnswer(finalAnswer)}` });
   complete("final", emit);
 }
 
@@ -293,36 +247,75 @@ async function runJudgeLikeNode(
     temperature: 0,
   });
 
-  try {
-    const parsed = JSON.parse(result.text) as Partial<JudgeResult>;
+  const parsed = parseJudgeJson(result.text);
+  if (parsed) {
     return {
       passed: Boolean(parsed.passed),
       issue: parsed.issue || null,
       rationale: parsed.rationale || "No rationale supplied.",
     };
-  } catch {
-    return {
-      passed: true,
-      issue: null,
-      rationale: preview(result.text) || "No blocking issue detected.",
-    };
   }
+  return {
+    passed: true,
+    issue: null,
+    rationale: preview(result.text) || "No blocking issue detected.",
+  };
 }
 
+// Models often wrap the verdict in ```json fences or add prose around it.
+// Strip fences and fall back to the first {...} block so valid verdicts are not discarded.
+function parseJudgeJson(text: string): Partial<JudgeResult> | null {
+  const candidates: string[] = [];
+  const unfenced = text.replace(/```(?:json)?/gi, "").trim();
+  candidates.push(unfenced);
+  const match = unfenced.match(/\{[\s\S]*\}/);
+  if (match) candidates.push(match[0]);
+  for (const candidate of candidates) {
+    try {
+      return JSON.parse(candidate) as Partial<JudgeResult>;
+    } catch {
+      // try next candidate
+    }
+  }
+  return null;
+}
+
+// When to trigger a correction:
+//  - The Fact Judge (correctness) can fire ON ITS OWN. A factually or logically wrong answer
+//    must be fixed even if it stays on-intent (Casper checks intent, not correctness, so it
+//    usually passes a wrong-but-on-topic answer and would otherwise veto the fix).
+//  - Casper alone (intent drift, Judge passed) is NOT enough, to avoid over-rewriting on style.
 function sharedObjection(casper: JudgeResult, judge: JudgeResult) {
-  if (!casper.issue || !judge.issue) return null;
-  const casperTerms = normalizeIssue(casper.issue);
-  const judgeTerms = normalizeIssue(judge.issue);
-  const overlap = casperTerms.some((term) => judgeTerms.includes(term));
-  return overlap ? `${casper.issue}; ${judge.issue}` : null;
+  if (judge.passed) return null;
+  const issues = [judge.issue, casper.passed ? null : casper.issue].filter(Boolean);
+  if (issues.length === 0) return null;
+  return issues.join("; ");
 }
 
-function normalizeIssue(issue: string) {
-  return issue
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, "")
-    .split(/\s+/)
-    .filter((term) => term.length > 4);
+// Cheap builders sometimes emit the answer as a ```json {"final_answer": ...}``` envelope.
+// Unwrap it so the user sees clean prose/code, not the internal artifact structure.
+function cleanFinalAnswer(text: string): string {
+  const stripped = text.replace(/```(?:json)?/gi, "").trim();
+  const match = stripped.match(/\{[\s\S]*\}/);
+  for (const candidate of [stripped, match?.[0]]) {
+    if (!candidate) continue;
+    try {
+      const obj = JSON.parse(candidate) as {
+        final_answer?: unknown;
+        files_to_create?: Array<{ filename?: string; content?: string }>;
+      };
+      if (obj && typeof obj.final_answer === "string") {
+        let out = obj.final_answer.trim();
+        for (const f of obj.files_to_create ?? []) {
+          if (f?.filename && f?.content) out += `\n\n**${f.filename}**\n\`\`\`\n${f.content}\n\`\`\``;
+        }
+        return out;
+      }
+    } catch {
+      // not a JSON envelope — fall through
+    }
+  }
+  return text.trim();
 }
 
 function preview(text: string, limit = 260) {

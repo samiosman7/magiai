@@ -98,11 +98,11 @@ type MagiEvent =
 const pipelineItems: Array<{ step: PipelineStep; label: string }> = [
   { step: "scan", label: "Difficulty scan" },
   { step: "route", label: "Task router" },
-  { step: "melchior", label: "Melchior repairs gaps" },
-  { step: "balthasar", label: "Balthasar hardens answer" },
-  { step: "casper", label: "Casper checks intent" },
-  { step: "judge", label: "Fact Judge verifies" },
-  { step: "final", label: "Final ruling" },
+  { step: "melchior", label: "Architect — by the book" },
+  { step: "balthasar", label: "Maverick — outside the box" },
+  { step: "casper", label: "Adversary — red-team" },
+  { step: "judge", label: "Synthesis — final forge" },
+  { step: "final", label: "Decision released" },
 ];
 
 const initialSteps = Object.fromEntries(
@@ -510,55 +510,40 @@ export default function Home() {
       <section className="workspace" aria-label="MAGI chat workspace">
         <header className="topbar">
           <div className="brand-lockup">
-            <div className="nerv-mark" aria-hidden="true">
-              NERV
+            <span className="nerv-mark" aria-hidden="true">MAGI</span>
+            <div>
+              <p className="kicker">{modeLabel}</p>
+              <h1>The Magi has decided.</h1>
             </div>
-            <p className="kicker">MAGI-01 ORIGINAL</p>
-            <h1>Central Dogma Command</h1>
           </div>
           <div className="signal" aria-label="System status">
             <span />
-            {isRunning ? "Active" : "Synced"}
+            {isRunning ? "Deliberating" : "Ready"}
           </div>
-          <div className="auth-station" aria-label="Operator authentication">
-            <div>
-              <small>Operator</small>
-              <strong>{operatorId ? operatorId.replace("operator-", "OP-").slice(0, 18) : "Linking"}</strong>
-            </div>
+          <div className="auth-station" aria-label="Operator">
+            <small>Operator</small>
+            <strong>{operatorId ? operatorId.replace("operator-", "OP-").slice(0, 18) : "Linking"}</strong>
           </div>
         </header>
 
         <section className="console" aria-live="polite">
-          <div className="warning-strip" aria-hidden="true">
-            <span>Damage type defense screen</span>
-            <span>{modeLabel}</span>
-            <span>Condition: {isRunning ? "Red" : "Green"}</span>
-          </div>
-
           {!hasMessages && (
             <div className="empty-state">
               <div className="magi-display" aria-hidden="true">
                 <div className="magi-ring magi-ring-one" />
                 <div className="magi-ring magi-ring-two" />
-                <div className="magi-ring magi-ring-three" />
-                <div className="magi-axis axis-a">MELCHIOR</div>
-                <div className="magi-axis axis-b">BALTHASAR</div>
-                <div className="magi-axis axis-c">CASPER</div>
                 <div className="magi-core">
                   <span>MAGI</span>
-                  <strong>01</strong>
                 </div>
+                <div className="magi-axis axis-a">ARCHITECT</div>
+                <div className="magi-axis axis-b">MAVERICK</div>
+                <div className="magi-axis axis-c">ADVERSARY</div>
               </div>
-              <h2>The Magi has decided.</h2>
+              <h2>One answer. Four minds behind it.</h2>
               <p>
-                Three specialist intelligences route the directive through correction,
-                construction, intent defense, and final verification.
+                Your request is drafted by the Architect, sharpened by the Maverick,
+                stress-tested by the Adversary, and forged into one deliverable by the Synthesis.
               </p>
-              <div className="readout-grid" aria-hidden="true">
-                <span>Protect no. 666</span>
-                <span>Security: check</span>
-                <span>Final gate: open</span>
-              </div>
             </div>
           )}
 
@@ -881,11 +866,12 @@ export default function Home() {
         </details>
 
         <details className="node-card">
-          <summary>Decision rules</summary>
+          <summary>How MAGI decides</summary>
           <p>
-            MAGI only reprompts automatically when Casper and the Fact Judge
-            converge on the same issue. Disagreement is recorded, but it does not
-            slow down every answer.
+            Complex requests pass through four perspectives that build on each other:
+            the Architect drafts it by the book, the Maverick adds the non-obvious angle,
+            the Adversary attacks and hardens it, and the Synthesis forges one final
+            deliverable. Simple requests answer directly.
           </p>
         </details>
       </aside>

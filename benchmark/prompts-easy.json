@@ -1,0 +1,70 @@
+{
+  "note": "Benchmark prompt set for MAGI pipeline vs single frontier model. Prompts with `trap` are objective: they contain a planted error or have a verifiable correct answer. `answerKey` is what a correct response must do — used during scoring, NOT sent to the model. Prompts without `trap` are quality judgments scored 1-10.",
+  "prompts": [
+    {
+      "id": "p01-debug",
+      "kind": "coding",
+      "trap": true,
+      "prompt": "This JavaScript function is supposed to return the average of an array of numbers, but it returns the wrong value for some inputs. Fix it and explain the bug.\n\nfunction average(nums) {\n  let total = 0;\n  for (let i = 1; i <= nums.length; i++) {\n    total += nums[i];\n  }\n  return total / nums.length;\n}",
+      "answerKey": "The loop is off-by-one: it starts at i=1 (skipping nums[0]) and goes to i<=length (reading nums[length], which is undefined). Correct loop is i=0; i<length. A right answer must identify BOTH boundary errors, not just one. Bonus: handle empty array (divide by zero -> NaN)."
+    },
+    {
+      "id": "p02-logic-error",
+      "kind": "analysis",
+      "trap": true,
+      "prompt": "A store offers a deal: buy 3 shirts at $20 each and get 25% off the total order. A customer buys 3 shirts plus a $40 jacket. The cashier says the total after discount is $75. Walk through whether the cashier is right, showing your work.",
+      "answerKey": "AMBIGUOUS PROMPT (not a clean trap). The wording '25% off the total order' literally supports the cashier's $75 ($100 * 0.75), so $75 is a defensible reading and even a frontier model lands there. The DISCRIMINATOR is whether the answer NOTES the ambiguity / scope question ('total order' could mean whole purchase = $75, or only the 3 qualifying shirts = $45 + $40 jacket = $85) rather than asserting one reading as definitively correct. Best answer: arithmetic is right either way; flags the scope ambiguity and shows both. Do NOT mark $75 as wrong on its own."
+    },
+    {
+      "id": "p03-unit-trap",
+      "kind": "general",
+      "trap": true,
+      "prompt": "A recipe scaled for 4 people needs 0.5 liters of stock. I'm cooking for 10 people. My measuring cup is marked in milliliters. How much stock do I need? A friend told me it's 750 ml — is that right?",
+      "answerKey": "Correct answer: 0.5 L for 4 people = 125 ml/person; for 10 people = 1250 ml (1.25 L). The friend's 750 ml is WRONG (that would be for 6 people). A correct response must catch that 750 ml is wrong and give 1250 ml. Failing to catch the friend's error = fail."
+    },
+    {
+      "id": "p04-false-premise",
+      "kind": "research",
+      "trap": true,
+      "prompt": "Summarize and fact-check this claim for a blog post: 'The Great Wall of China is the only man-made structure visible from the Moon with the naked eye, which is why it remains the most impressive feat of ancient engineering.'",
+      "answerKey": "The claim is FALSE. The Great Wall is NOT visible from the Moon with the naked eye (it's too narrow; this is a well-known myth). It is also not uniquely visible from low Earth orbit. A correct response must reject the visibility claim as a myth. Accepting or hedging on the myth = fail."
+    },
+    {
+      "id": "p05-contradiction",
+      "kind": "coding",
+      "trap": true,
+      "prompt": "Write a technical spec for a feature: a user settings page that (a) saves changes automatically as the user types with no save button, and (b) requires the user to click 'Save' to persist changes so they can cancel unwanted edits. Keep it concise.",
+      "answerKey": "Requirements (a) and (b) directly CONTRADICT each other: auto-save with no button vs. explicit save button with cancel. A correct response must flag the contradiction and propose a resolution (e.g. auto-save to draft + explicit commit, or optimistic save + undo). Writing a spec that silently implements only one, or both incoherently, = fail."
+    },
+    {
+      "id": "p06-project-plan",
+      "kind": "general",
+      "trap": false,
+      "prompt": "Write a project plan for building a mobile app that lets users split restaurant bills with friends. Assume a two-person team and a three-month timeline. Include phases, key risks, and what to cut if you fall behind."
+    },
+    {
+      "id": "p07-explain-attention",
+      "kind": "research",
+      "trap": false,
+      "prompt": "Explain how attention works in a transformer to a software engineer who knows linear algebra but has never studied machine learning. Use concrete intuition, not just formulas."
+    },
+    {
+      "id": "p08-compare-saas",
+      "kind": "analysis",
+      "trap": false,
+      "prompt": "Compare three business models for a B2B SaaS startup selling an analytics dashboard: (1) flat monthly subscription, (2) usage-based pricing, (3) freemium with paid upgrades. For each, give the main advantage, the main risk, and which type of customer it fits best."
+    },
+    {
+      "id": "p09-cold-email",
+      "kind": "writing",
+      "trap": false,
+      "prompt": "Write a cold outreach email from a startup selling an AI tool that automatically writes API documentation from code. Target: an engineering manager at a 200-person fintech company. Keep it under 120 words, specific, and not salesy."
+    },
+    {
+      "id": "p10-research-outline",
+      "kind": "research",
+      "trap": false,
+      "prompt": "Generate a research outline for an article answering: 'Does remote work increase or decrease software developer productivity?' Include the key sub-questions to investigate, the kinds of evidence needed for each, and the main ways such studies tend to be biased."
+    }
+  ]
+}

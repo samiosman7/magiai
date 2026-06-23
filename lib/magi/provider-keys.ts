@@ -9,6 +9,8 @@ export function getProviderKeys(provider: ProviderName) {
   if (provider === "anthropic") return uniqueKeys(process.env.ANTHROPIC_API_KEY);
   if (provider === "deepseek") return uniqueKeys(process.env.DEEPSEEK_API_KEY);
   if (provider === "qwen") return uniqueKeys(process.env.QWEN_API_KEY);
+  if (provider === "openrouter") return uniqueKeys(process.env.OPENROUTER_API_KEY);
+  if (provider === "vercel") return uniqueKeys(process.env.AI_GATEWAY_API_KEY);
 
   return [];
 }
