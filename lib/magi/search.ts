@@ -41,7 +41,9 @@ export function buildGrounding(results: SearchResult[]): { block: string; source
   const block =
     "RESEARCHED SOURCES — base every factual claim ONLY on these; cite inline as [n]; do not invent facts beyond them:\n" +
     results.map((r, i) => `[${i + 1}] ${r.title} — ${r.url}\n${r.content}`).join("\n\n");
+  const n = results.length;
+  const note = `_Checked against ${n} source${n > 1 ? "s" : ""}; claims they don't support were flagged or cut._`;
   const sourcesList =
-    "## Sources\n" + results.map((r, i) => `${i + 1}. [${r.title}](${r.url})`).join("\n");
+    `${note}\n\n## Sources\n` + results.map((r, i) => `${i + 1}. [${r.title}](${r.url})`).join("\n");
   return { block, sourcesList };
 }
