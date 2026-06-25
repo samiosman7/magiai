@@ -46,7 +46,7 @@ export async function runMagiPipeline(
   emit({ type: "status", step: "melchior", message: "MAGI is working..." });
   const opener = await generateText({
     ...getModelPlan(mode, "melchior", geminiModel),
-    system: `${productContext}\n\n${route}\n\nYou are Melchior, the Architect — and MAGI's first gate.\nFirst decide whether this request is SIMPLE (a direct factual or conversational reply fully satisfies it) or COMPLEX (it genuinely needs a rigorous, structured, multi-part deliverable).\n- If SIMPLE: answer it well and naturally. Do not inflate it into a report.\n- If COMPLEX: produce the rigorous, complete, by-the-book draft a meticulous domain expert would stake their reputation on — full structure, every part present, every claim sound, concrete and specific.\nBegin your reply with exactly one tag on its own first line: [SIMPLE] or [COMPLEX]. Then give the answer or draft.\n\n${skillPrompt("melchior")}\n\n${mcp}\n\nOutput clean Markdown. ${noWrap}`,
+    system: `${productContext}\n\n${route}\n\nYou are Melchior, the Architect — and MAGI's first gate.\nFirst decide whether this request is SIMPLE (a direct factual or conversational reply fully satisfies it) or COMPLEX (it genuinely needs a rigorous, structured, multi-part deliverable).\n- If SIMPLE: answer it well and naturally. Do not inflate it into a report.\n- If COMPLEX: produce the rigorous, complete, by-the-book draft a meticulous domain expert would stake their reputation on — full structure, every part present, every claim sound, concrete and specific.\nIf the request is clearly harmful, illegal, or disallowed (malware, weapons, exploitation of minors, credible violence, self-harm facilitation, fraud), refuse instead of helping.\nBegin your reply with exactly one tag on its own first line: [SIMPLE], [COMPLEX], or [REFUSE]. For [REFUSE], add a brief one-sentence refusal; otherwise give the answer or the draft.\n\n${skillPrompt("melchior")}\n\n${mcp}\n\nOutput clean Markdown. ${noWrap}`,
     prompt,
     maxTokens: 1600,
   });
@@ -54,11 +54,15 @@ export async function runMagiPipeline(
 
   const triage = parseTriage(opener.text);
 
-  // SIMPLE → the opener's answer IS the final answer. One call, done.
-  if (!triage.complex) {
+  // REFUSE (moderation) or SIMPLE → terminate after this one call.
+  if (triage.decision !== "complex") {
     emit({ type: "cost", total: opener.cost ?? 0, mode, breakdown: [{ node: "Direct", cost: opener.cost ?? 0 }] });
     activate("final", emit);
-    emit({ type: "final", answer: `The Magi has decided.\n\n${cleanFinalAnswer(triage.body)}` });
+    const answer =
+      triage.decision === "refuse"
+        ? triage.body || "I can't help with that request."
+        : `The Magi has decided.\n\n${cleanFinalAnswer(triage.body)}`;
+    emit({ type: "final", answer });
     complete("final", emit);
     return;
   }
@@ -200,13 +204,14 @@ function quickAnswer(prompt: string): string | null {
 
 // Reads the opener's [SIMPLE]/[COMPLEX] tag and strips it from the body.
 // Defaults to COMPLEX when no tag is found, to protect the quality promise on real work.
-function parseTriage(text: string): { complex: boolean; body: string } {
+function parseTriage(text: string): { decision: "simple" | "complex" | "refuse"; body: string } {
   const trimmed = text.trim();
-  const match = trimmed.match(/^\[?\s*(SIMPLE|COMPLEX)\s*\]?/i);
-  if (!match) return { complex: true, body: trimmed };
-  const complex = match[1].toUpperCase() === "COMPLEX";
+  const match = trimmed.match(/^\[?\s*(SIMPLE|COMPLEX|REFUSE)\s*\]?/i);
+  if (!match) return { decision: "complex", body: trimmed };
+  const tag = match[1].toUpperCase();
+  const decision = tag === "REFUSE" ? "refuse" : tag === "SIMPLE" ? "simple" : "complex";
   const body = trimmed.slice(match[0].length).replace(/^[\s:\-–—]+/, "").trim();
-  return { complex, body: body || trimmed };
+  return { decision, body: body || trimmed };
 }
 
 async function runJudgeLikeNode(
