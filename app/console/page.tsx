@@ -140,6 +140,13 @@ const heroRoles: Array<{ name: string; desc: string }> = [
   { name: "Synthesis", desc: "forges the final answer" },
 ];
 
+const examplePrompts = [
+  "Research the current state of solid-state batteries and summarize with sources",
+  "Compare three project-management tools for a 10-person agency and recommend one",
+  "Write a go-to-market plan for a B2B automated-invoicing SaaS",
+  "Draft a competitive analysis of the top 3 meal-kit companies",
+];
+
 function createId() {
   return crypto.randomUUID();
 }
@@ -644,6 +651,18 @@ export default function Home() {
               <p className="hero-hint">
                 Running on <strong>{modeInfo[mode].label}</strong> · {modeInfo[mode].models}
               </p>
+              <div className="hero-examples">
+                {examplePrompts.map((ex) => (
+                  <button
+                    type="button"
+                    key={ex}
+                    className="hero-example"
+                    onClick={() => setPrompt(ex)}
+                  >
+                    {ex}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
