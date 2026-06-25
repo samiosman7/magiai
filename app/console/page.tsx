@@ -331,7 +331,15 @@ export default function Home() {
       const response = await fetch("/api/magi", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-magi-user-id": operatorId },
-        body: JSON.stringify({ prompt: trimmed, mode, geminiModel }),
+        body: JSON.stringify({
+          prompt: trimmed,
+          mode,
+          geminiModel,
+          history: messages
+            .filter((m) => m.kind === "user" || m.kind === "magi")
+            .slice(-8)
+            .map((m) => ({ role: m.kind === "user" ? "user" : "assistant", text: m.text })),
+        }),
         signal: controller.signal,
       });
 

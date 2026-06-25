@@ -42,7 +42,18 @@ export async function POST(request: Request) {
     prompt?: unknown;
     mode?: unknown;
     geminiModel?: unknown;
+    history?: unknown;
   } | null;
+
+  const history = Array.isArray(body?.history)
+    ? (body.history as unknown[])
+        .filter(
+          (h): h is { role: string; text: string } =>
+            !!h && typeof (h as { text?: unknown }).text === "string"
+        )
+        .slice(-8)
+        .map((h) => ({ role: h.role === "user" ? "user" : "assistant", text: h.text.slice(0, 2000) }))
+    : undefined;
 
   const prompt = typeof body?.prompt === "string" ? body.prompt.trim() : "";
   const mode = validModes.has(String(body?.mode)) ? (body?.mode as MagiMode) : "standard";
@@ -104,7 +115,7 @@ export async function POST(request: Request) {
           name: "Credit gate",
           text: `${creditCheck.creditsRequired} credits authorized for ${mode} mode.`,
         });
-        await runMagiPipeline(prompt, mode, emit, geminiModel, request.signal);
+        await runMagiPipeline(prompt, mode, emit, geminiModel, request.signal, history);
         succeeded = true;
       } catch {
         // Graceful failure: clean user-facing message, and don't charge for a broken run.

@@ -17,9 +17,17 @@ export async function runMagiPipeline(
   mode: MagiMode,
   emit: Emit,
   geminiModel?: GeminiModel,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  history?: Array<{ role: string; text: string }>
 ) {
   const taskProfile = classifyTask(prompt);
+
+  const historyBlock =
+    history && history.length
+      ? `Conversation so far (most recent last):\n${history
+          .map((h) => `${h.role === "user" ? "User" : "MAGI"}: ${h.text.slice(0, 1500)}`)
+          .join("\n")}\n\n---\n\n`
+      : "";
 
   // Instant, free shortcuts (greetings, plain arithmetic) — no model call at all.
   const quick = quickAnswer(prompt);
@@ -61,7 +69,7 @@ export async function runMagiPipeline(
   const opener = await generateText({
     ...getModelPlan(mode, "melchior", geminiModel),
     system: `${productContext}\n\n${route}\n\nYou are Melchior, the Architect — and MAGI's first gate.\nFirst decide whether this request is SIMPLE (a direct factual or conversational reply fully satisfies it) or COMPLEX (it genuinely needs a rigorous, structured, multi-part deliverable).\n- If SIMPLE: answer it well and naturally. Do not inflate it into a report.\n- If COMPLEX: produce the rigorous, complete, by-the-book draft a meticulous domain expert would stake their reputation on — full structure, every part present, every claim sound, concrete and specific.\nIf the request is clearly harmful, illegal, or disallowed (malware, weapons, exploitation of minors, credible violence, self-harm facilitation, fraud), refuse instead of helping.\nBegin your reply with exactly one tag on its own first line: [SIMPLE], [COMPLEX], or [REFUSE]. For [REFUSE], add a brief one-sentence refusal; otherwise give the answer or the draft.\n\n${skillPrompt("melchior")}\n\n${mcp}\n\nOutput clean Markdown. ${noWrap}\n\n${grounding}`,
-    prompt,
+    prompt: historyBlock ? `${historyBlock}Current request:\n${prompt}` : prompt,
     maxTokens: 1600,
     signal,
   });
