@@ -75,3 +75,17 @@ alter table public.magi_waitlist enable row level security;
 
 create index if not exists magi_waitlist_created_idx
   on public.magi_waitlist(created_at desc);
+
+-- Daily spend tracking for cost caps (one row per user per UTC day).
+-- Inserts/updates via the service role (server); no public RLS policy.
+create table if not exists public.magi_spend (
+  user_id text not null,
+  day date not null default current_date,
+  spent_usd numeric not null default 0,
+  run_count integer not null default 0,
+  primary key (user_id, day)
+);
+
+alter table public.magi_spend enable row level security;
+
+create index if not exists magi_spend_day_idx on public.magi_spend(day);

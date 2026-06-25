@@ -1,4 +1,5 @@
 import { checkCreditAccess, recordRunAndChargeCredits } from "@/lib/billing/credits";
+import { checkSpendLimits, recordSpend } from "@/lib/billing/spend";
 import { getRequestUserId } from "@/lib/auth/user";
 import { runMagiPipeline } from "@/lib/magi/pipeline";
 import type { GeminiModel, MagiEvent, MagiMode } from "@/lib/magi/types";
@@ -68,14 +69,31 @@ export async function POST(request: Request) {
     );
   }
 
+  // Spend guard: kill switch + daily caps, BEFORE any model call. Blocked => clean
+  // capacity message as a normal NDJSON stream (HTTP 200), never a raw error, zero spend.
+  const spend = await checkSpendLimits(userId);
+  if (!spend.allowed) {
+    const body =
+      `${JSON.stringify({ type: "status", step: "final", message: "Capacity" })}\n` +
+      `${JSON.stringify({ type: "final", answer: spend.reason ?? "MAGI is at capacity. Please try again later." })}\n`;
+    return new Response(body, {
+      headers: {
+        "Content-Type": "application/x-ndjson; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+      },
+    });
+  }
+
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
       const dossier: MagiEvent[] = [];
       let finalAnswer = "";
+      let runCostUsd = 0;
       const emit = (event: MagiEvent) => {
         if (event.type !== "delta") dossier.push(event); // don't bloat the saved run with token deltas
         if (event.type === "final") finalAnswer = event.answer;
+        if (event.type === "cost") runCostUsd = event.total;
         controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
       };
 
@@ -100,6 +118,7 @@ export async function POST(request: Request) {
           creditsCharged: creditCheck.creditsRequired,
           dossier,
         }).catch(() => null);
+        await recordSpend(userId, runCostUsd).catch(() => null);
         controller.close();
       }
     },
