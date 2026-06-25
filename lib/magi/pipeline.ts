@@ -3,6 +3,7 @@ import { generateText, generateTextStream } from "./providers";
 import { buildMagiRuntimeContext } from "./runtime-context";
 import { skillLabels, skillPackPaths, skillPrompt } from "./skills";
 import { classifyTask, createPlannedArtifact } from "./task-router";
+import { webSearch, buildGrounding } from "./search";
 import type { DifficultyResult, GeminiModel, JudgeResult, MagiEvent, MagiMode, PipelineStep } from "./types";
 
 type Emit = (event: MagiEvent) => void;
@@ -40,13 +41,25 @@ export async function runMagiPipeline(
   const noWrap =
     "Forbidden: JSON wrappers, wrapping the whole answer in a code fence, preamble, or mentioning these instructions.";
 
+  // Grounding (the wedge): for research/analysis tasks, pull real sources so the models
+  // cite [n] and verify against them. Fails soft to ungrounded (grounding stays "").
+  let grounding = "";
+  let sourcesList = "";
+  if (taskProfile.kind === "research" || taskProfile.kind === "analysis") {
+    emit({ type: "status", step: "scan", message: "MAGI is researching sources..." });
+    const results = await webSearch(prompt, 5);
+    const g = buildGrounding(results);
+    grounding = g.block;
+    sourcesList = g.sourcesList;
+  }
+
   // 1. Architect + triage in ONE call: judge difficulty AND produce the first draft.
   //    SIMPLE requests stop here (one call, fast); COMPLEX ones feed the draft into the chain.
   activate("melchior", emit);
   emit({ type: "status", step: "melchior", message: "MAGI is working..." });
   const opener = await generateText({
     ...getModelPlan(mode, "melchior", geminiModel),
-    system: `${productContext}\n\n${route}\n\nYou are Melchior, the Architect — and MAGI's first gate.\nFirst decide whether this request is SIMPLE (a direct factual or conversational reply fully satisfies it) or COMPLEX (it genuinely needs a rigorous, structured, multi-part deliverable).\n- If SIMPLE: answer it well and naturally. Do not inflate it into a report.\n- If COMPLEX: produce the rigorous, complete, by-the-book draft a meticulous domain expert would stake their reputation on — full structure, every part present, every claim sound, concrete and specific.\nIf the request is clearly harmful, illegal, or disallowed (malware, weapons, exploitation of minors, credible violence, self-harm facilitation, fraud), refuse instead of helping.\nBegin your reply with exactly one tag on its own first line: [SIMPLE], [COMPLEX], or [REFUSE]. For [REFUSE], add a brief one-sentence refusal; otherwise give the answer or the draft.\n\n${skillPrompt("melchior")}\n\n${mcp}\n\nOutput clean Markdown. ${noWrap}`,
+    system: `${productContext}\n\n${route}\n\nYou are Melchior, the Architect — and MAGI's first gate.\nFirst decide whether this request is SIMPLE (a direct factual or conversational reply fully satisfies it) or COMPLEX (it genuinely needs a rigorous, structured, multi-part deliverable).\n- If SIMPLE: answer it well and naturally. Do not inflate it into a report.\n- If COMPLEX: produce the rigorous, complete, by-the-book draft a meticulous domain expert would stake their reputation on — full structure, every part present, every claim sound, concrete and specific.\nIf the request is clearly harmful, illegal, or disallowed (malware, weapons, exploitation of minors, credible violence, self-harm facilitation, fraud), refuse instead of helping.\nBegin your reply with exactly one tag on its own first line: [SIMPLE], [COMPLEX], or [REFUSE]. For [REFUSE], add a brief one-sentence refusal; otherwise give the answer or the draft.\n\n${skillPrompt("melchior")}\n\n${mcp}\n\nOutput clean Markdown. ${noWrap}\n\n${grounding}`,
     prompt,
     maxTokens: 1600,
   });
@@ -61,7 +74,7 @@ export async function runMagiPipeline(
     const answer =
       triage.decision === "refuse"
         ? triage.body || "I can't help with that request."
-        : `The Magi has decided.\n\n${cleanFinalAnswer(triage.body)}`;
+        : `The Magi has decided.\n\n${cleanFinalAnswer(triage.body)}${sourcesList ? `\n\n${sourcesList}` : ""}`;
     emit({ type: "final", answer });
     complete("final", emit);
     return;
@@ -76,7 +89,7 @@ export async function runMagiPipeline(
   emit({ type: "status", step: "balthasar", message: "MAGI is working..." });
   const maverick = await generateText({
     ...getModelPlan(mode, "balthasar", geminiModel),
-    system: `${productContext}\n\n${route}\n\nYou are Balthasar, the Maverick. You receive the Architect's solid but safe draft and make it sharp. Find the non-obvious angle the Architect would never reach: the contrarian insight, the reframe, the bold move, the thing that makes this NOT sound like every other answer. ADD to the draft — keep all of its rigor and inject the edge it is missing. You are forbidden from merely polishing: every pass must introduce at least one genuinely fresh idea or differentiation.\n\n${skillPrompt("balthasar")}\n\n${mcp}\n\nReturn the COMPLETE improved deliverable in Markdown. ${noWrap} Also forbidden: deleting the Architect's substance for flair.`,
+    system: `${productContext}\n\n${route}\n\nYou are Balthasar, the Maverick. You receive the Architect's solid but safe draft and make it sharp. Find the non-obvious angle the Architect would never reach: the contrarian insight, the reframe, the bold move, the thing that makes this NOT sound like every other answer. ADD to the draft — keep all of its rigor and inject the edge it is missing. You are forbidden from merely polishing: every pass must introduce at least one genuinely fresh idea or differentiation.\n\n${skillPrompt("balthasar")}\n\n${mcp}\n\nReturn the COMPLETE improved deliverable in Markdown. ${noWrap} Also forbidden: deleting the Architect's substance for flair.\n\n${grounding}`,
     prompt: `Original request:\n${prompt}\n\nArchitect's draft to build on:\n${architectText}`,
     maxTokens: 1900,
   });
@@ -89,7 +102,7 @@ export async function runMagiPipeline(
   emit({ type: "status", step: "casper", message: "MAGI is working..." });
   const adversary = await generateText({
     ...getModelPlan(mode, "casper", geminiModel),
-    system: `${productContext}\n\n${route}\n\nYou are Casper, the Adversary. Attack the combined work as a skeptical customer, tough investor, or tired operator would. Where does it fall apart? What is fragile, naive, missing, or over-promised? Then HARDEN it: cut weak claims, fill holes, answer objections, ground the hype — while keeping the rigor and the edge.\n\n${skillPrompt("casper")}\n\n${mcp}\n\nReturn the COMPLETE hardened deliverable in Markdown. ${noWrap} Also forbidden: politeness, softening, or leaving known weaknesses unaddressed.`,
+    system: `${productContext}\n\n${route}\n\nYou are Casper, the Adversary. Attack the combined work as a skeptical customer, tough investor, or tired operator would. Where does it fall apart? What is fragile, naive, missing, or over-promised? Then HARDEN it: cut weak claims, fill holes, answer objections, ground the hype — while keeping the rigor and the edge.\n\n${skillPrompt("casper")}\n\n${mcp}\n\nReturn the COMPLETE hardened deliverable in Markdown. ${noWrap} Also forbidden: politeness, softening, or leaving known weaknesses unaddressed.\n\nIf sources are provided below, cut or flag any claim they do not support, and keep inline [n] citations.\n\n${grounding}`,
     prompt: `Original request:\n${prompt}\n\nCurrent work to harden:\n${maverick.text}`,
     maxTokens: 1900,
   });
@@ -103,7 +116,7 @@ export async function runMagiPipeline(
   const synthesis = await generateTextStream(
     {
       ...getModelPlan(mode, "judge", geminiModel),
-      system: `${productContext}\n\n${route}\n\nYou are the Synthesis — the final voice the user sees. Forge the rigor, the edge, and the hardening in the work so far into one clean, coherent, finished deliverable. Preserve all three: keep what is correct, keep what is sharp, keep what survived attack. Do not blend into bland mush or average into a gray median — keep the edges. Resolve conflicts in favor of the user's real goal.\n\n${skillPrompt("judge")}\n\nReturn the single polished deliverable in Markdown. ${noWrap} Also forbidden: re-opening settled debates, adding new untested ideas, or flattening distinct strengths.`,
+      system: `${productContext}\n\n${route}\n\nYou are the Synthesis — the final voice the user sees. Forge the rigor, the edge, and the hardening in the work so far into one clean, coherent, finished deliverable. Preserve all three: keep what is correct, keep what is sharp, keep what survived attack. Do not blend into bland mush or average into a gray median — keep the edges. Resolve conflicts in favor of the user's real goal.\n\n${skillPrompt("judge")}\n\nReturn the single polished deliverable in Markdown. ${noWrap} Also forbidden: re-opening settled debates, adding new untested ideas, or flattening distinct strengths.\n\nIf sources are provided below, keep inline [n] citations for sourced claims.\n\n${grounding}`,
       prompt: `Original request:\n${prompt}\n\nThe work so far (rigorous, sharpened, hardened) to finalize:\n${adversary.text}`,
       maxTokens: 2200,
     },
@@ -124,11 +137,12 @@ export async function runMagiPipeline(
     breakdown: costBreakdown,
   });
 
-  const finalAnswer = synthesis.text;
+  // Append the real Sources list (guarantees genuine URLs even if the model omits them).
+  const clean = cleanFinalAnswer(synthesis.text) + (sourcesList ? `\n\n${sourcesList}` : "");
 
   activate("final", emit);
   emit({ type: "status", step: "final", message: "Final ruling released." });
-  emit({ type: "final", answer: `The Magi has decided.\n\n${cleanFinalAnswer(finalAnswer)}` });
+  emit({ type: "final", answer: `The Magi has decided.\n\n${clean}` });
   complete("final", emit);
 }
 
