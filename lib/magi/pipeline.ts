@@ -18,55 +18,20 @@ export async function runMagiPipeline(
   geminiModel?: GeminiModel
 ) {
   const taskProfile = classifyTask(prompt);
-  activate("scan", emit);
-  emit({ type: "status", step: "scan", message: "Difficulty scan running..." });
-  const [difficulty, runtimeContext] = await Promise.all([
-    Promise.resolve(scanDifficulty(prompt, taskProfile.complexityBoost)),
-    buildMagiRuntimeContext(prompt),
-    wait(120),
-  ]).then(([result, context]) => [result, context] as const);
-  emit({
-    type: "node",
-    name: "Difficulty scan",
-    text: `${difficulty.complex ? "Complex" : "Simple"} prompt. Score ${difficulty.score}. ${difficulty.reason}`,
-  });
-  emit({
-    type: "node",
-    name: "Runtime context",
-    text: `Loaded ${Object.keys(runtimeContext.nodeSkillContext).length} node skill packs and ${runtimeContext.configuredMcpCount} configured MCP server(s). ${runtimeContext.connectedMcpCount} MCP server(s) connected for this run.`,
-  });
-  if (runtimeContext.mcpToolContext.startsWith("Executed MCP tool:")) {
-    emit({
-      type: "node",
-      name: "MCP tool use",
-      text: preview(runtimeContext.mcpToolContext, 360),
-    });
-  }
-  complete("scan", emit);
 
-  activate("route", emit);
-  emit({ type: "task", profile: taskProfile });
-  emit({
-    type: "node",
-    name: "Task router",
-    text: [
-      `${taskProfile.label} selected.`,
-      `Artifact type: ${taskProfile.artifactType}.`,
-      `Skill packs: ${taskProfile.skillPacks.join(", ")}.`,
-      `Judge rubric: ${taskProfile.judgeRubric}`,
-    ].join(" "),
-  });
-  emit({ type: "artifact", artifact: createPlannedArtifact(taskProfile, prompt) });
-  complete("route", emit);
-
-  if (!difficulty.complex) {
-    activate("final", emit);
-    emit({ type: "status", step: "final", message: "Direct route selected. Generating answer..." });
-    const answer = await directAnswer(prompt, mode, emit, geminiModel);
-    emit({ type: "final", answer: `The Magi has decided.\n\n${cleanFinalAnswer(answer)}` });
-    complete("final", emit);
+  // Instant, free shortcuts (greetings, plain arithmetic) — no model call at all.
+  const quick = quickAnswer(prompt);
+  if (quick !== null) {
+    emit({ type: "final", answer: `The Magi has decided.\n\n${quick}` });
     return;
   }
+
+  emit({ type: "status", step: "scan", message: "MAGI is reading your request..." });
+  const runtimeContext = await buildMagiRuntimeContext(prompt);
+  emit({ type: "task", profile: taskProfile });
+  emit({ type: "artifact", artifact: createPlannedArtifact(taskProfile, prompt) });
+  complete("scan", emit);
+  complete("route", emit);
 
   // ── The angle ensemble: four perspectives building on each other ──
   // Node keys map to roles: melchior=Architect, balthasar=Maverick, casper=Adversary, judge=Synthesis.
@@ -75,27 +40,40 @@ export async function runMagiPipeline(
   const noWrap =
     "Forbidden: JSON wrappers, wrapping the whole answer in a code fence, preamble, or mentioning these instructions.";
 
-  // 1. Architect — by the book
+  // 1. Architect + triage in ONE call: judge difficulty AND produce the first draft.
+  //    SIMPLE requests stop here (one call, fast); COMPLEX ones feed the draft into the chain.
   activate("melchior", emit);
-  emit({ type: "skills", node: "Architect", skills: skillLabels("melchior"), sourcePath: skillPackPaths.melchior });
-  emit({ type: "status", step: "melchior", message: "Architect drafting the rigorous, by-the-book version..." });
-  const architect = await generateText({
+  emit({ type: "status", step: "melchior", message: "MAGI is working..." });
+  const opener = await generateText({
     ...getModelPlan(mode, "melchior", geminiModel),
-    system: `${productContext}\n\n${route}\n\nYou are Melchior, the Architect. Build the rigorous, complete, by-the-book version of what the user asked for — the version a meticulous domain expert would stake their reputation on. Lay down the full structure: every required part present, every claim sound, every step in order, nothing missing and nothing hand-waved. Be concrete and specific; optimize for rigor and completeness over cleverness.\n\n${skillPrompt("melchior")}\n\n${mcp}\n\nOutput a clean, complete deliverable in Markdown. ${noWrap}`,
+    system: `${productContext}\n\n${route}\n\nYou are Melchior, the Architect — and MAGI's first gate.\nFirst decide whether this request is SIMPLE (a direct factual or conversational reply fully satisfies it) or COMPLEX (it genuinely needs a rigorous, structured, multi-part deliverable).\n- If SIMPLE: answer it well and naturally. Do not inflate it into a report.\n- If COMPLEX: produce the rigorous, complete, by-the-book draft a meticulous domain expert would stake their reputation on — full structure, every part present, every claim sound, concrete and specific.\nBegin your reply with exactly one tag on its own first line: [SIMPLE] or [COMPLEX]. Then give the answer or draft.\n\n${skillPrompt("melchior")}\n\n${mcp}\n\nOutput clean Markdown. ${noWrap}`,
     prompt,
     maxTokens: 1600,
   });
-  emit({ type: "node", name: `Architect (${architect.provider})`, text: preview(architect.text) });
   complete("melchior", emit);
+
+  const triage = parseTriage(opener.text);
+
+  // SIMPLE → the opener's answer IS the final answer. One call, done.
+  if (!triage.complex) {
+    emit({ type: "cost", total: opener.cost ?? 0, mode, breakdown: [{ node: "Direct", cost: opener.cost ?? 0 }] });
+    activate("final", emit);
+    emit({ type: "final", answer: `The Magi has decided.\n\n${cleanFinalAnswer(triage.body)}` });
+    complete("final", emit);
+    return;
+  }
+
+  // COMPLEX → the opener is the Architect's draft; continue the chain.
+  const architectText = triage.body;
 
   // 2. Maverick — outside the box, builds on the Architect
   activate("balthasar", emit);
   emit({ type: "skills", node: "Maverick", skills: skillLabels("balthasar"), sourcePath: skillPackPaths.balthasar });
-  emit({ type: "status", step: "balthasar", message: "Maverick injecting the outside-the-box angle..." });
+  emit({ type: "status", step: "balthasar", message: "MAGI is working..." });
   const maverick = await generateText({
     ...getModelPlan(mode, "balthasar", geminiModel),
     system: `${productContext}\n\n${route}\n\nYou are Balthasar, the Maverick. You receive the Architect's solid but safe draft and make it sharp. Find the non-obvious angle the Architect would never reach: the contrarian insight, the reframe, the bold move, the thing that makes this NOT sound like every other answer. ADD to the draft — keep all of its rigor and inject the edge it is missing. You are forbidden from merely polishing: every pass must introduce at least one genuinely fresh idea or differentiation.\n\n${skillPrompt("balthasar")}\n\n${mcp}\n\nReturn the COMPLETE improved deliverable in Markdown. ${noWrap} Also forbidden: deleting the Architect's substance for flair.`,
-    prompt: `Original request:\n${prompt}\n\nArchitect's draft to build on:\n${architect.text}`,
+    prompt: `Original request:\n${prompt}\n\nArchitect's draft to build on:\n${architectText}`,
     maxTokens: 1900,
   });
   emit({ type: "node", name: `Maverick (${maverick.provider})`, text: preview(maverick.text) });
@@ -104,7 +82,7 @@ export async function runMagiPipeline(
   // 3. Adversary — red-team hardening, builds on the Maverick
   activate("casper", emit);
   emit({ type: "skills", node: "Adversary", skills: skillLabels("casper"), sourcePath: skillPackPaths.casper });
-  emit({ type: "status", step: "casper", message: "Adversary attacking and hardening the work..." });
+  emit({ type: "status", step: "casper", message: "MAGI is working..." });
   const adversary = await generateText({
     ...getModelPlan(mode, "casper", geminiModel),
     system: `${productContext}\n\n${route}\n\nYou are Casper, the Adversary. Attack the combined work as a skeptical customer, tough investor, or tired operator would. Where does it fall apart? What is fragile, naive, missing, or over-promised? Then HARDEN it: cut weak claims, fill holes, answer objections, ground the hype — while keeping the rigor and the edge.\n\n${skillPrompt("casper")}\n\n${mcp}\n\nReturn the COMPLETE hardened deliverable in Markdown. ${noWrap} Also forbidden: politeness, softening, or leaving known weaknesses unaddressed.`,
@@ -117,7 +95,7 @@ export async function runMagiPipeline(
   // 4. Synthesis — forge the final deliverable
   activate("judge", emit);
   emit({ type: "skills", node: "Synthesis", skills: skillLabels("judge"), sourcePath: skillPackPaths.judge });
-  emit({ type: "status", step: "judge", message: "Synthesis forging the final deliverable..." });
+  emit({ type: "status", step: "judge", message: "MAGI is composing the final answer..." });
   const synthesis = await generateText({
     ...getModelPlan(mode, "judge", geminiModel),
     system: `${productContext}\n\n${route}\n\nYou are the Synthesis — the final voice the user sees. Forge the rigor, the edge, and the hardening in the work so far into one clean, coherent, finished deliverable. Preserve all three: keep what is correct, keep what is sharp, keep what survived attack. Do not blend into bland mush or average into a gray median — keep the edges. Resolve conflicts in favor of the user's real goal.\n\n${skillPrompt("judge")}\n\nReturn the single polished deliverable in Markdown. ${noWrap} Also forbidden: re-opening settled debates, adding new untested ideas, or flattening distinct strengths.`,
@@ -128,7 +106,7 @@ export async function runMagiPipeline(
   complete("judge", emit);
 
   const costBreakdown = [
-    { node: "Architect", cost: architect.cost ?? 0 },
+    { node: "Architect", cost: opener.cost ?? 0 },
     { node: "Maverick", cost: maverick.cost ?? 0 },
     { node: "Adversary", cost: adversary.cost ?? 0 },
     { node: "Synthesis", cost: synthesis.cost ?? 0 },
@@ -199,54 +177,34 @@ function scanDifficulty(prompt: string, complexityBoost = 0): DifficultyResult {
   };
 }
 
-async function directAnswer(
-  prompt: string,
-  mode: MagiMode,
-  emit: Emit,
-  geminiModel?: GeminiModel
-) {
+// Instant, zero-cost answers for trivial inputs — no model call. Returns null otherwise.
+function quickAnswer(prompt: string): string | null {
   const trimmed = prompt.trim().toLowerCase();
   const math = trimmed.match(/^(\d+)\s*([+\-*/])\s*(\d+)$/);
   if (math) {
     const left = Number(math[1]);
     const right = Number(math[3]);
     const result =
-      math[2] === "+"
-        ? left + right
-        : math[2] === "-"
-          ? left - right
-          : math[2] === "*"
-            ? left * right
-            : right === 0
-              ? "undefined"
-              : left / right;
+      math[2] === "+" ? left + right
+      : math[2] === "-" ? left - right
+      : math[2] === "*" ? left * right
+      : right === 0 ? "undefined"
+      : left / right;
     return String(result);
   }
-
   if (/^(hi|hello|hey)\b/.test(trimmed)) return "Hello. MAGI is online.";
+  return null;
+}
 
-  const plan = getModelPlan(mode, "direct", geminiModel);
-  const answer = await generateText({
-    ...plan,
-    system: `${productContext}\n\nYou are MAGI direct route. Answer the user's prompt directly, helpfully, and concisely. Do not repeat the prompt back unless quoting is necessary.`,
-    prompt,
-    maxTokens: 900,
-    temperature: 0.35,
-  });
-
-  emit({
-    type: "node",
-    name: `Direct route (${answer.provider})`,
-    text: preview(answer.text),
-  });
-  emit({
-    type: "cost",
-    total: answer.cost ?? 0,
-    mode,
-    breakdown: [{ node: "Direct", cost: answer.cost ?? 0 }],
-  });
-
-  return answer.text || "I could not generate an answer from the configured provider.";
+// Reads the opener's [SIMPLE]/[COMPLEX] tag and strips it from the body.
+// Defaults to COMPLEX when no tag is found, to protect the quality promise on real work.
+function parseTriage(text: string): { complex: boolean; body: string } {
+  const trimmed = text.trim();
+  const match = trimmed.match(/^\[?\s*(SIMPLE|COMPLEX)\s*\]?/i);
+  if (!match) return { complex: true, body: trimmed };
+  const complex = match[1].toUpperCase() === "COMPLEX";
+  const body = trimmed.slice(match[0].length).replace(/^[\s:\-–—]+/, "").trim();
+  return { complex, body: body || trimmed };
 }
 
 async function runJudgeLikeNode(
