@@ -47,6 +47,7 @@ export async function generateTextStream(
       stream: true,
       stream_options: { include_usage: true },
     }),
+    signal: call.signal,
   });
 
   if (!response.ok || !response.body) {
@@ -129,6 +130,7 @@ async function openAiCompatible(
       max_tokens: call.maxTokens ?? 900,
       temperature: call.temperature ?? 0.25,
     }),
+    signal: call.signal,
   });
 
   if (!response.ok) {

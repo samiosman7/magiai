@@ -1340,3 +1340,6 @@ h1 {
 .legal-note { border-left: 3px solid var(--red); padding: 8px 14px; background: var(--panel-strong); border-radius: 6px; font-size: 0.9rem; }
 .legal-back { margin-top: 32px; }
 .legal-back a { color: var(--blue); text-decoration: none; }
+
+.composer-input .stop-button { background: var(--panel-strong); border: 1px solid var(--red); color: var(--red); }
+.composer-input .stop-button:hover { background: rgba(255,91,46,0.1); }

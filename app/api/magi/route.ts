@@ -104,7 +104,7 @@ export async function POST(request: Request) {
           name: "Credit gate",
           text: `${creditCheck.creditsRequired} credits authorized for ${mode} mode.`,
         });
-        await runMagiPipeline(prompt, mode, emit, geminiModel);
+        await runMagiPipeline(prompt, mode, emit, geminiModel, request.signal);
         succeeded = true;
       } catch {
         // Graceful failure: clean user-facing message, and don't charge for a broken run.

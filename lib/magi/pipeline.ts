@@ -16,7 +16,8 @@ export async function runMagiPipeline(
   prompt: string,
   mode: MagiMode,
   emit: Emit,
-  geminiModel?: GeminiModel
+  geminiModel?: GeminiModel,
+  signal?: AbortSignal
 ) {
   const taskProfile = classifyTask(prompt);
 
@@ -62,6 +63,7 @@ export async function runMagiPipeline(
     system: `${productContext}\n\n${route}\n\nYou are Melchior, the Architect — and MAGI's first gate.\nFirst decide whether this request is SIMPLE (a direct factual or conversational reply fully satisfies it) or COMPLEX (it genuinely needs a rigorous, structured, multi-part deliverable).\n- If SIMPLE: answer it well and naturally. Do not inflate it into a report.\n- If COMPLEX: produce the rigorous, complete, by-the-book draft a meticulous domain expert would stake their reputation on — full structure, every part present, every claim sound, concrete and specific.\nIf the request is clearly harmful, illegal, or disallowed (malware, weapons, exploitation of minors, credible violence, self-harm facilitation, fraud), refuse instead of helping.\nBegin your reply with exactly one tag on its own first line: [SIMPLE], [COMPLEX], or [REFUSE]. For [REFUSE], add a brief one-sentence refusal; otherwise give the answer or the draft.\n\n${skillPrompt("melchior")}\n\n${mcp}\n\nOutput clean Markdown. ${noWrap}\n\n${grounding}`,
     prompt,
     maxTokens: 1600,
+    signal,
   });
   complete("melchior", emit);
 
@@ -92,6 +94,7 @@ export async function runMagiPipeline(
     system: `${productContext}\n\n${route}\n\nYou are Balthasar, the Maverick. You receive the Architect's solid but safe draft and make it sharp. Find the non-obvious angle the Architect would never reach: the contrarian insight, the reframe, the bold move, the thing that makes this NOT sound like every other answer. ADD to the draft — keep all of its rigor and inject the edge it is missing. You are forbidden from merely polishing: every pass must introduce at least one genuinely fresh idea or differentiation.\n\n${skillPrompt("balthasar")}\n\n${mcp}\n\nReturn the COMPLETE improved deliverable in Markdown. ${noWrap} Also forbidden: deleting the Architect's substance for flair.\n\n${grounding}`,
     prompt: `Original request:\n${prompt}\n\nArchitect's draft to build on:\n${architectText}`,
     maxTokens: 1900,
+    signal,
   });
   emit({ type: "node", name: `Maverick (${maverick.provider})`, text: preview(maverick.text) });
   complete("balthasar", emit);
@@ -105,6 +108,7 @@ export async function runMagiPipeline(
     system: `${productContext}\n\n${route}\n\nYou are Casper, the Adversary. Attack the combined work as a skeptical customer, tough investor, or tired operator would. Where does it fall apart? What is fragile, naive, missing, or over-promised? Then HARDEN it: cut weak claims, fill holes, answer objections, ground the hype — while keeping the rigor and the edge.\n\n${skillPrompt("casper")}\n\n${mcp}\n\nReturn the COMPLETE hardened deliverable in Markdown. ${noWrap} Also forbidden: politeness, softening, or leaving known weaknesses unaddressed.\n\nIf sources are provided below, cut or flag any claim they do not support, and keep inline [n] citations.\n\n${grounding}`,
     prompt: `Original request:\n${prompt}\n\nCurrent work to harden:\n${maverick.text}`,
     maxTokens: 1900,
+    signal,
   });
   emit({ type: "node", name: `Adversary (${adversary.provider})`, text: preview(adversary.text) });
   complete("casper", emit);
@@ -119,6 +123,7 @@ export async function runMagiPipeline(
       system: `${productContext}\n\n${route}\n\nYou are the Synthesis — the final voice the user sees. Forge the rigor, the edge, and the hardening in the work so far into one clean, coherent, finished deliverable. Preserve all three: keep what is correct, keep what is sharp, keep what survived attack. Do not blend into bland mush or average into a gray median — keep the edges. Resolve conflicts in favor of the user's real goal.\n\n${skillPrompt("judge")}\n\nReturn the single polished deliverable in Markdown. ${noWrap} Also forbidden: re-opening settled debates, adding new untested ideas, or flattening distinct strengths.\n\nIf sources are provided below, keep inline [n] citations for sourced claims.\n\n${grounding}`,
       prompt: `Original request:\n${prompt}\n\nThe work so far (rigorous, sharpened, hardened) to finalize:\n${adversary.text}`,
       maxTokens: 2200,
+      signal,
     },
     (piece) => emit({ type: "delta", text: piece })
   );

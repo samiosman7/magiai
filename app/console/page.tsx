@@ -467,6 +467,13 @@ export default function Home() {
     ]);
   }
 
+  function stopRun() {
+    // Aborts the fetch; the server sees the disconnect and stops further model calls (stops spend).
+    abortRef.current?.abort();
+    setIsRunning(false);
+    streamingIdRef.current = null;
+  }
+
   function resetRun() {
     abortRef.current?.abort();
     setMessages([]);
@@ -697,9 +704,13 @@ export default function Home() {
               onChange={(event) => setPrompt(event.target.value)}
               disabled={isRunning}
             />
-            <button type="submit" disabled={isRunning}>
-              {isRunning ? "Running" : "Decide"}
-            </button>
+            {isRunning ? (
+              <button type="button" onClick={stopRun} className="stop-button">
+                Stop
+              </button>
+            ) : (
+              <button type="submit">Decide</button>
+            )}
           </div>
         </form>
       </section>

@@ -36,6 +36,7 @@ export type ModelCall = {
   prompt: string;
   maxTokens?: number;
   temperature?: number;
+  signal?: AbortSignal; // aborts the underlying fetch (client cancel stops spend)
 };
 
 export type ModelResult = {
