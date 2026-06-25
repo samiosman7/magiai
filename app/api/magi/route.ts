@@ -74,7 +74,7 @@ export async function POST(request: Request) {
       const dossier: MagiEvent[] = [];
       let finalAnswer = "";
       const emit = (event: MagiEvent) => {
-        dossier.push(event);
+        if (event.type !== "delta") dossier.push(event); // don't bloat the saved run with token deltas
         if (event.type === "final") finalAnswer = event.answer;
         controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
       };

@@ -1,5 +1,5 @@
 import { getModelPlan } from "./model-plan";
-import { generateText } from "./providers";
+import { generateText, generateTextStream } from "./providers";
 import { buildMagiRuntimeContext } from "./runtime-context";
 import { skillLabels, skillPackPaths, skillPrompt } from "./skills";
 import { classifyTask, createPlannedArtifact } from "./task-router";
@@ -94,15 +94,17 @@ export async function runMagiPipeline(
 
   // 4. Synthesis — forge the final deliverable
   activate("judge", emit);
-  emit({ type: "skills", node: "Synthesis", skills: skillLabels("judge"), sourcePath: skillPackPaths.judge });
   emit({ type: "status", step: "judge", message: "MAGI is composing the final answer..." });
-  const synthesis = await generateText({
-    ...getModelPlan(mode, "judge", geminiModel),
-    system: `${productContext}\n\n${route}\n\nYou are the Synthesis — the final voice the user sees. Forge the rigor, the edge, and the hardening in the work so far into one clean, coherent, finished deliverable. Preserve all three: keep what is correct, keep what is sharp, keep what survived attack. Do not blend into bland mush or average into a gray median — keep the edges. Resolve conflicts in favor of the user's real goal.\n\n${skillPrompt("judge")}\n\nReturn the single polished deliverable in Markdown. ${noWrap} Also forbidden: re-opening settled debates, adding new untested ideas, or flattening distinct strengths.`,
-    prompt: `Original request:\n${prompt}\n\nThe work so far (rigorous, sharpened, hardened) to finalize:\n${adversary.text}`,
-    maxTokens: 2200,
-  });
-  emit({ type: "node", name: `Synthesis (${synthesis.provider})`, text: preview(synthesis.text) });
+  emit({ type: "answer_start" });
+  const synthesis = await generateTextStream(
+    {
+      ...getModelPlan(mode, "judge", geminiModel),
+      system: `${productContext}\n\n${route}\n\nYou are the Synthesis — the final voice the user sees. Forge the rigor, the edge, and the hardening in the work so far into one clean, coherent, finished deliverable. Preserve all three: keep what is correct, keep what is sharp, keep what survived attack. Do not blend into bland mush or average into a gray median — keep the edges. Resolve conflicts in favor of the user's real goal.\n\n${skillPrompt("judge")}\n\nReturn the single polished deliverable in Markdown. ${noWrap} Also forbidden: re-opening settled debates, adding new untested ideas, or flattening distinct strengths.`,
+      prompt: `Original request:\n${prompt}\n\nThe work so far (rigorous, sharpened, hardened) to finalize:\n${adversary.text}`,
+      maxTokens: 2200,
+    },
+    (piece) => emit({ type: "delta", text: piece })
+  );
   complete("judge", emit);
 
   const costBreakdown = [

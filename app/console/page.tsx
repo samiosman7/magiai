@@ -93,6 +93,8 @@ type MagiEvent =
   | { type: "artifact"; artifact: MagiArtifact }
   | { type: "step"; step: PipelineStep; state: StepState }
   | { type: "cost"; total: number; mode: string; breakdown: Array<{ node: string; cost: number }> }
+  | { type: "answer_start" }
+  | { type: "delta"; text: string }
   | { type: "final"; answer: string }
   | { type: "error"; message: string };
 
@@ -155,6 +157,7 @@ export default function Home() {
   const [costByMode, setCostByMode] = useState<Record<string, number>>({});
   const abortRef = useRef<AbortController | null>(null);
   const currentPromptRef = useRef("");
+  const streamingIdRef = useRef<string | null>(null);
 
   const hasMessages = messages.length > 0;
 
@@ -288,6 +291,7 @@ export default function Home() {
     setTaskProfile(null);
     setArtifacts([]);
     setRunCost(null);
+    streamingIdRef.current = null;
 
     try {
       const response = await fetch("/api/magi", {
@@ -387,6 +391,24 @@ export default function Home() {
       return;
     }
 
+    if (event.type === "answer_start") {
+      const id = createId();
+      streamingIdRef.current = id;
+      setMessages((current) => [...current, { id, kind: "magi", text: "" }]);
+      return;
+    }
+
+    if (event.type === "delta") {
+      const id = streamingIdRef.current;
+      if (!id) return;
+      setMessages((current) =>
+        current.map((message) =>
+          message.id === id ? { ...message, text: message.text + event.text } : message
+        )
+      );
+      return;
+    }
+
     if (event.type === "final") {
       const sourcePrompt = currentPromptRef.current;
       const currentArtifact = artifacts[artifacts.length - 1];
@@ -403,15 +425,28 @@ export default function Home() {
           ...current,
         ].slice(0, 20));
       }
-      setMessages((current) => [
-        ...current,
-        {
-          id: createId(),
-          kind: "magi",
-          text: event.answer,
-          downloadPrompt: latestWebsitePrompt(current),
-        },
-      ]);
+      const streamId = streamingIdRef.current;
+      streamingIdRef.current = null;
+      if (streamId) {
+        // Finalize the streamed bubble with the authoritative, cleaned answer.
+        setMessages((current) =>
+          current.map((message) =>
+            message.id === streamId
+              ? { ...message, text: event.answer, downloadPrompt: latestWebsitePrompt(current) }
+              : message
+          )
+        );
+      } else {
+        setMessages((current) => [
+          ...current,
+          {
+            id: createId(),
+            kind: "magi",
+            text: event.answer,
+            downloadPrompt: latestWebsitePrompt(current),
+          },
+        ]);
+      }
       return;
     }
 
@@ -430,6 +465,7 @@ export default function Home() {
     setTaskProfile(null);
     setArtifacts([]);
     setRunCost(null);
+    streamingIdRef.current = null;
     setIsRunning(false);
   }
 

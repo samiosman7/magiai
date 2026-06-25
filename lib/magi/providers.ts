@@ -17,6 +17,81 @@ export async function generateText(call: ModelCall): Promise<ModelResult> {
   return mockGenerate(call);
 }
 
+// Streams a completion token-by-token via the Vercel gateway (OpenAI-compatible SSE),
+// calling onDelta for each chunk. Returns the full ModelResult (with cost) at the end.
+// Falls back to non-streaming generateText for providers/keys that can't stream.
+export async function generateTextStream(
+  call: ModelCall,
+  onDelta: (text: string) => void
+): Promise<ModelResult> {
+  if (call.provider !== "vercel" || !process.env.AI_GATEWAY_API_KEY || process.env.MAGI_MOCK_MODE === "true") {
+    const result = await generateText(call);
+    if (result.text) onDelta(result.text);
+    return result;
+  }
+
+  const response = await fetchWithRetry("https://ai-gateway.vercel.sh/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.AI_GATEWAY_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: call.model,
+      messages: [
+        { role: "system", content: call.system },
+        { role: "user", content: call.prompt },
+      ],
+      max_tokens: call.maxTokens ?? 900,
+      temperature: call.temperature ?? 0.25,
+      stream: true,
+      stream_options: { include_usage: true },
+    }),
+  });
+
+  if (!response.ok || !response.body) {
+    const result = await generateText(call);
+    if (result.text) onDelta(result.text);
+    return result;
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let full = "";
+  let cost: number | undefined;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("data:")) continue;
+      const payload = trimmed.slice(5).trim();
+      if (payload === "[DONE]") continue;
+      try {
+        const json = JSON.parse(payload) as {
+          choices?: Array<{ delta?: { content?: string } }>;
+          usage?: { cost?: number };
+        };
+        const piece = json.choices?.[0]?.delta?.content;
+        if (piece) {
+          full += piece;
+          onDelta(piece);
+        }
+        if (typeof json.usage?.cost === "number") cost = json.usage.cost;
+      } catch {
+        // ignore partial/non-JSON keepalive lines
+      }
+    }
+  }
+
+  return { text: full.trim(), provider: call.provider, model: call.model, isMock: false, cost };
+}
+
 // Retries transient rate-limit (429) and server (5xx) responses with exponential backoff.
 async function fetchWithRetry(url: string, init: RequestInit, attempts = 5): Promise<Response> {
   let delay = 800;

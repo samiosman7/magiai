@@ -99,5 +99,7 @@ export type MagiEvent =
   | { type: "artifact"; artifact: MagiArtifact }
   | { type: "step"; step: PipelineStep; state: "" | "active" | "done" }
   | { type: "cost"; total: number; mode: string; breakdown: Array<{ node: string; cost: number }> }
+  | { type: "answer_start" }
+  | { type: "delta"; text: string }
   | { type: "final"; answer: string }
   | { type: "error"; message: string };
