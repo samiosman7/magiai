@@ -26,26 +26,32 @@ export async function checkSpendLimits(userId: string): Promise<SpendDecision> {
 
   const globalCap = num(process.env.MAGI_DAILY_USD_CAP, 25);
   const userCap = num(process.env.MAGI_USER_DAILY_USD_CAP, 2);
+  const userRunCap = num(process.env.MAGI_USER_DAILY_RUNS, 50);
 
   try {
     const supabase = getSupabaseAdmin();
     const { data, error } = await supabase
       .from("magi_spend")
-      .select("user_id,spent_usd")
+      .select("user_id,spent_usd,run_count")
       .eq("day", today());
 
     if (error) return { allowed: true }; // fail open on read error
     const rows = data ?? [];
     const globalSpent = rows.reduce((sum, r) => sum + Number(r.spent_usd || 0), 0);
-    const userSpent = rows
-      .filter((r) => r.user_id === userId)
-      .reduce((sum, r) => sum + Number(r.spent_usd || 0), 0);
+    const userRows = rows.filter((r) => r.user_id === userId);
+    const userSpent = userRows.reduce((sum, r) => sum + Number(r.spent_usd || 0), 0);
+    const userRuns = userRows.reduce((sum, r) => sum + Number(r.run_count || 0), 0);
 
     if (globalSpent >= globalCap) {
       return { allowed: false, reason: "MAGI is at capacity for today. Service resumes after the daily reset." };
     }
     if (userSpent >= userCap) {
       return { allowed: false, reason: "You've reached today's usage limit. It resets at 00:00 UTC." };
+    }
+    // Durable per-user daily request cap (Supabase-backed, survives serverless restarts —
+    // unlike the in-memory hourly limiter, which stays only as a coarse burst guard).
+    if (userRuns >= userRunCap) {
+      return { allowed: false, reason: "You've reached today's request limit. It resets at 00:00 UTC." };
     }
     return { allowed: true };
   } catch {
@@ -54,7 +60,7 @@ export async function checkSpendLimits(userId: string): Promise<SpendDecision> {
 }
 
 export async function recordSpend(userId: string, costUsd: number): Promise<void> {
-  if (!hasSupabaseConfig() || !(costUsd > 0)) return;
+  if (!hasSupabaseConfig()) return; // count every run (even $0) for the request cap
   try {
     const supabase = getSupabaseAdmin();
     const day = today();
@@ -69,7 +75,7 @@ export async function recordSpend(userId: string, costUsd: number): Promise<void
       {
         user_id: userId,
         day,
-        spent_usd: Number(data?.spent_usd || 0) + costUsd,
+        spent_usd: Number(data?.spent_usd || 0) + (costUsd > 0 ? costUsd : 0),
         run_count: Number(data?.run_count || 0) + 1,
       },
       { onConflict: "user_id,day" }
