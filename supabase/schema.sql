@@ -60,3 +60,18 @@ create index if not exists magi_artifacts_user_created_idx
 
 create index if not exists magi_artifacts_run_idx
   on public.magi_artifacts(run_id);
+
+-- Waitlist for the pre-launch landing page. Inserts happen via the service role
+-- (server-side API route), so no public RLS policy is granted.
+create table if not exists public.magi_waitlist (
+  id uuid primary key default gen_random_uuid(),
+  email text not null unique,
+  source text,
+  referrer text,
+  created_at timestamptz not null default now()
+);
+
+alter table public.magi_waitlist enable row level security;
+
+create index if not exists magi_waitlist_created_idx
+  on public.magi_waitlist(created_at desc);
