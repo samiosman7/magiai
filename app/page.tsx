@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import Link from "next/link";
 
 const ANGLES = [
   { n: "01", name: "Architect", desc: "Builds the rigorous draft from real, current sources — not the model's memory." },
@@ -137,6 +138,10 @@ export default function Waitlist() {
 
       <footer className="lp-footer">
         <span className="lp-mark">MAGI</span>
+        <span className="lp-footer-links">
+          <Link href="/terms">Terms</Link>
+          <Link href="/privacy">Privacy</Link>
+        </span>
         <span>The Magi has decided.</span>
       </footer>
     </main>
