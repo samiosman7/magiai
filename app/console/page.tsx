@@ -194,6 +194,11 @@ export default function Home() {
   const streamingIdRef = useRef<string | null>(null);
 
   const hasMessages = messages.length > 0;
+  // Developer panels are hidden by default; append ?dev=1 to inspect internals.
+  const showDev = useMemo(
+    () => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("dev") === "1",
+    []
+  );
 
   const modeLabel = useMemo(() => {
     if (mode === "economy") return "Economy MAGI";
@@ -830,6 +835,7 @@ export default function Home() {
           </div>
         </details>
 
+        {showDev && (
         <details className="node-card" open>
           <summary>Task route</summary>
           {taskProfile ? (
@@ -847,6 +853,7 @@ export default function Home() {
             <p>No task route selected yet.</p>
           )}
         </details>
+        )}
 
         <details className="node-card" open>
           <summary>Artifacts</summary>
@@ -881,6 +888,7 @@ export default function Home() {
           </div>
         </details>
 
+        {showDev && (
         <details className="node-card">
           <summary>Credits</summary>
           <div className="billing-box">
@@ -899,7 +907,9 @@ export default function Home() {
             </div>
           </div>
         </details>
+        )}
 
+        {showDev && (
         <details className="node-card" open>
           <summary>Node outputs</summary>
           <div className="node-log">
@@ -915,7 +925,9 @@ export default function Home() {
             )}
           </div>
         </details>
+        )}
 
+        {showDev && (
         <details className="node-card">
           <summary>Saved artifacts</summary>
           <div className="saved-artifact-log">
@@ -933,6 +945,7 @@ export default function Home() {
             )}
           </div>
         </details>
+        )}
 
         <details className="node-card">
           <summary>Workspace history</summary>
@@ -961,6 +974,7 @@ export default function Home() {
           </div>
         </details>
 
+        {showDev && (
         <details className="node-card">
           <summary>Providers</summary>
           <div className="provider-log">
@@ -975,7 +989,9 @@ export default function Home() {
             ))}
           </div>
         </details>
+        )}
 
+        {showDev && (
         <details className="node-card">
           <summary>MCP catalog</summary>
           <div className="mcp-log">
@@ -998,7 +1014,9 @@ export default function Home() {
             )}
           </div>
         </details>
+        )}
 
+        {showDev && (
         <details className="node-card">
           <summary>Active skills</summary>
           <div className="skill-log">
@@ -1019,7 +1037,9 @@ export default function Home() {
             )}
           </div>
         </details>
+        )}
 
+        {showDev && (
         <details className="node-card">
           <summary>MCP servers</summary>
           <div className="mcp-log">
@@ -1046,6 +1066,7 @@ export default function Home() {
             )}
           </div>
         </details>
+        )}
 
         <details className="node-card">
           <summary>How MAGI decides</summary>
