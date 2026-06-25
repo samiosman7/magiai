@@ -1352,3 +1352,22 @@ h1 {
   transition: border-color 0.12s, color 0.12s;
 }
 .hero-example:hover { border-color: var(--red); color: var(--text); }
+
+/* ---- mobile / responsive pass for the console ---- */
+@media (max-width: 900px) {
+  .shell { grid-template-columns: 1fr; padding: 8px; gap: 8px; }
+  .workspace { min-height: 72vh; }
+  .workspace, .dossier { clip-path: none; border-width: 1px; }
+}
+@media (max-width: 600px) {
+  .topbar { flex-wrap: wrap; gap: 10px; padding: 12px 14px; }
+  .auth-station { display: none; }
+  .nerv-mark { width: 84px; min-height: 58px; font-size: 1rem; }
+  .console { padding: 12px 12px 14px; }
+  .composer { padding: 12px; }
+  .composer-input { flex-direction: column; }
+  .composer-input button { width: 100%; padding: 12px; }
+  .mode-cards { grid-template-columns: 1fr; }
+  .empty-state h2 { font-size: clamp(1.8rem, 8vw, 2.6rem); }
+  .message { max-width: 100%; }
+}
