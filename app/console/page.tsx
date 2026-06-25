@@ -1,6 +1,17 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { marked } from "marked";
+import DOMPurify from "dompurify";
+
+marked.setOptions({ gfm: true, breaks: true });
+
+// Render a MAGI answer's Markdown to sanitized HTML. Sanitize only in the browser
+// (DOMPurify needs window); answers never render during SSR since they arrive client-side.
+function renderMarkdown(text: string): string {
+  const html = marked.parse(text ?? "", { async: false }) as string;
+  return typeof window === "undefined" ? html : DOMPurify.sanitize(html);
+}
 
 type PipelineStep = "scan" | "route" | "melchior" | "balthasar" | "casper" | "judge" | "final";
 type StepState = "" | "active" | "done";
@@ -632,7 +643,14 @@ export default function Home() {
           <div className="messages">
             {messages.map((message) => (
               <article className={`message ${message.kind}`} key={message.id}>
-                {message.text}
+                {message.kind === "magi" ? (
+                  <div
+                    className="message-md"
+                    dangerouslySetInnerHTML={{ __html: renderMarkdown(message.text) }}
+                  />
+                ) : (
+                  message.text
+                )}
                 {message.downloadPrompt && (
                   <button
                     className="download-button"
