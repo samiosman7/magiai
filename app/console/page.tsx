@@ -151,6 +151,22 @@ function createId() {
   return crypto.randomUUID();
 }
 
+function copyText(text: string) {
+  navigator.clipboard?.writeText(text).catch(() => {});
+}
+
+function downloadMarkdown(text: string) {
+  const blob = new Blob([text], { type: "text/markdown;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "magi-answer.md";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 export default function Home() {
   const [prompt, setPrompt] = useState("");
   const [mode, setMode] = useState<"economy" | "standard" | "premium">("standard");
@@ -670,10 +686,20 @@ export default function Home() {
             {messages.map((message) => (
               <article className={`message ${message.kind}`} key={message.id}>
                 {message.kind === "magi" ? (
-                  <div
-                    className="message-md"
-                    dangerouslySetInnerHTML={{ __html: renderMarkdown(message.text) }}
-                  />
+                  <>
+                    <div
+                      className="message-md"
+                      dangerouslySetInnerHTML={{ __html: renderMarkdown(message.text) }}
+                    />
+                    {message.text && (
+                      <div className="msg-tools">
+                        <button type="button" onClick={() => copyText(message.text)}>Copy</button>
+                        <button type="button" onClick={() => downloadMarkdown(message.text)}>
+                          Download .md
+                        </button>
+                      </div>
+                    )}
+                  </>
                 ) : (
                   message.text
                 )}
