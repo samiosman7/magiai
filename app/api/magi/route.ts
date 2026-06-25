@@ -90,6 +90,7 @@ export async function POST(request: Request) {
       const dossier: MagiEvent[] = [];
       let finalAnswer = "";
       let runCostUsd = 0;
+      let succeeded = false;
       const emit = (event: MagiEvent) => {
         if (event.type !== "delta") dossier.push(event); // don't bloat the saved run with token deltas
         if (event.type === "final") finalAnswer = event.answer;
@@ -104,10 +105,12 @@ export async function POST(request: Request) {
           text: `${creditCheck.creditsRequired} credits authorized for ${mode} mode.`,
         });
         await runMagiPipeline(prompt, mode, emit, geminiModel);
-      } catch (error) {
+        succeeded = true;
+      } catch {
+        // Graceful failure: clean user-facing message, and don't charge for a broken run.
         emit({
-          type: "error",
-          message: error instanceof Error ? error.message : "MAGI pipeline failed.",
+          type: "final",
+          answer: "MAGI couldn't finish this request. You haven't been charged — please try again.",
         });
       } finally {
         await recordRunAndChargeCredits({
@@ -115,9 +118,10 @@ export async function POST(request: Request) {
           mode,
           prompt,
           finalAnswer,
-          creditsCharged: creditCheck.creditsRequired,
+          creditsCharged: succeeded ? creditCheck.creditsRequired : 0,
           dossier,
         }).catch(() => null);
+        // Record real cost actually incurred (even on failure) so caps stay accurate.
         await recordSpend(userId, runCostUsd).catch(() => null);
         controller.close();
       }
