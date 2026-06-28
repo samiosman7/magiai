@@ -61,9 +61,22 @@ export async function generateTextStream(
   let buffer = "";
   let full = "";
   let cost: number | undefined;
+  const idleMs = Number(process.env.MAGI_STREAM_IDLE_MS) || 30000;
 
   while (true) {
-    const { done, value } = await reader.read();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const read = await Promise.race([
+      reader.read(),
+      new Promise<{ done: true; value: undefined; timedOut: true }>((resolve) => {
+        timer = setTimeout(() => resolve({ done: true, value: undefined, timedOut: true }), idleMs);
+      }),
+    ]);
+    clearTimeout(timer);
+    if ((read as { timedOut?: boolean }).timedOut) {
+      await reader.cancel().catch(() => {});
+      break; // stalled stream — return what we have rather than hang
+    }
+    const { done, value } = read;
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
     const lines = buffer.split("\n");

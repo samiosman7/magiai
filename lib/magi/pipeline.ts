@@ -97,51 +97,78 @@ export async function runMagiPipeline(
   activate("balthasar", emit);
   emit({ type: "skills", node: "Maverick", skills: skillLabels("balthasar"), sourcePath: skillPackPaths.balthasar });
   emit({ type: "status", step: "balthasar", message: "MAGI is working..." });
-  const maverick = await generateText({
-    ...getModelPlan(mode, "balthasar", geminiModel),
-    system: `${productContext}\n\n${route}\n\nYou are Balthasar, the Maverick. You receive the Architect's solid but safe draft and make it sharp. Find the non-obvious angle the Architect would never reach: the contrarian insight, the reframe, the bold move, the thing that makes this NOT sound like every other answer. ADD to the draft — keep all of its rigor and inject the edge it is missing. You are forbidden from merely polishing: every pass must introduce at least one genuinely fresh idea or differentiation.\n\n${skillPrompt("balthasar")}\n\n${mcp}\n\nReturn the COMPLETE improved deliverable in Markdown. ${noWrap} Also forbidden: deleting the Architect's substance for flair.\n\n${grounding}`,
-    prompt: `Original request:\n${prompt}\n\nArchitect's draft to build on:\n${architectText}`,
-    maxTokens: 1900,
-    signal,
-  });
-  emit({ type: "node", name: `Maverick (${maverick.provider})`, text: preview(maverick.text) });
+  // Each downstream node falls back to the best prior draft if it errors, so one
+  // flaky model call degrades quality instead of failing the whole run.
+  let maverickText = architectText;
+  let maverickCost = 0;
+  try {
+    const maverick = await generateText({
+      ...getModelPlan(mode, "balthasar", geminiModel),
+      system: `${productContext}\n\n${route}\n\nYou are Balthasar, the Maverick. You receive the Architect's solid but safe draft and make it sharp. Find the non-obvious angle the Architect would never reach: the contrarian insight, the reframe, the bold move, the thing that makes this NOT sound like every other answer. ADD to the draft — keep all of its rigor and inject the edge it is missing. You are forbidden from merely polishing: every pass must introduce at least one genuinely fresh idea or differentiation.\n\n${skillPrompt("balthasar")}\n\n${mcp}\n\nReturn the COMPLETE improved deliverable in Markdown. ${noWrap} Also forbidden: deleting the Architect's substance for flair.\n\n${grounding}`,
+      prompt: `Original request:\n${prompt}\n\nArchitect's draft to build on:\n${architectText}`,
+      maxTokens: 1900,
+      signal,
+    });
+    maverickText = maverick.text || architectText;
+    maverickCost = maverick.cost ?? 0;
+    emit({ type: "node", name: `Maverick (${maverick.provider})`, text: preview(maverick.text) });
+  } catch {
+    /* keep the Architect's draft */
+  }
   complete("balthasar", emit);
 
   // 3. Adversary — red-team hardening, builds on the Maverick
   activate("casper", emit);
   emit({ type: "skills", node: "Adversary", skills: skillLabels("casper"), sourcePath: skillPackPaths.casper });
   emit({ type: "status", step: "casper", message: "MAGI is working..." });
-  const adversary = await generateText({
-    ...getModelPlan(mode, "casper", geminiModel),
-    system: `${productContext}\n\n${route}\n\nYou are Casper, the Adversary. Attack the combined work as a skeptical customer, tough investor, or tired operator would. Where does it fall apart? What is fragile, naive, missing, or over-promised? Then HARDEN it: cut weak claims, fill holes, answer objections, ground the hype — while keeping the rigor and the edge.\n\n${skillPrompt("casper")}\n\n${mcp}\n\nReturn the COMPLETE hardened deliverable in Markdown. ${noWrap} Also forbidden: politeness, softening, or leaving known weaknesses unaddressed.\n\nIf sources are provided below, cut or flag any claim they do not support, and keep inline [n] citations.\n\n${grounding}`,
-    prompt: `Original request:\n${prompt}\n\nCurrent work to harden:\n${maverick.text}`,
-    maxTokens: 1900,
-    signal,
-  });
-  emit({ type: "node", name: `Adversary (${adversary.provider})`, text: preview(adversary.text) });
+  let adversaryText = maverickText;
+  let adversaryCost = 0;
+  try {
+    const adversary = await generateText({
+      ...getModelPlan(mode, "casper", geminiModel),
+      system: `${productContext}\n\n${route}\n\nYou are Casper, the Adversary. Attack the combined work as a skeptical customer, tough investor, or tired operator would. Where does it fall apart? What is fragile, naive, missing, or over-promised? Then HARDEN it: cut weak claims, fill holes, answer objections, ground the hype — while keeping the rigor and the edge.\n\n${skillPrompt("casper")}\n\n${mcp}\n\nReturn the COMPLETE hardened deliverable in Markdown. ${noWrap} Also forbidden: politeness, softening, or leaving known weaknesses unaddressed.\n\nIf sources are provided below, cut or flag any claim they do not support, and keep inline [n] citations.\n\n${grounding}`,
+      prompt: `Original request:\n${prompt}\n\nCurrent work to harden:\n${maverickText}`,
+      maxTokens: 1900,
+      signal,
+    });
+    adversaryText = adversary.text || maverickText;
+    adversaryCost = adversary.cost ?? 0;
+    emit({ type: "node", name: `Adversary (${adversary.provider})`, text: preview(adversary.text) });
+  } catch {
+    /* keep the Maverick draft */
+  }
   complete("casper", emit);
 
-  // 4. Synthesis — forge the final deliverable
+  // 4. Synthesis — streams; falls back to the Adversary draft if it errors
   activate("judge", emit);
   emit({ type: "status", step: "judge", message: "MAGI is composing the final answer..." });
   emit({ type: "answer_start" });
-  const synthesis = await generateTextStream(
-    {
-      ...getModelPlan(mode, "judge", geminiModel),
-      system: `${productContext}\n\n${route}\n\nYou are the Synthesis — the final voice the user sees. Forge the rigor, the edge, and the hardening in the work so far into one clean, coherent, finished deliverable. Preserve all three: keep what is correct, keep what is sharp, keep what survived attack. Do not blend into bland mush or average into a gray median — keep the edges. Resolve conflicts in favor of the user's real goal.\n\n${skillPrompt("judge")}\n\nReturn the single polished deliverable in Markdown. ${noWrap} Also forbidden: re-opening settled debates, adding new untested ideas, or flattening distinct strengths.\n\nIf sources are provided below, keep inline [n] citations for sourced claims.\n\n${grounding}`,
-      prompt: `Original request:\n${prompt}\n\nThe work so far (rigorous, sharpened, hardened) to finalize:\n${adversary.text}`,
-      maxTokens: 2200,
-      signal,
-    },
-    (piece) => emit({ type: "delta", text: piece })
-  );
+  let synthesisText = "";
+  let synthesisCost = 0;
+  try {
+    const synthesis = await generateTextStream(
+      {
+        ...getModelPlan(mode, "judge", geminiModel),
+        system: `${productContext}\n\n${route}\n\nYou are the Synthesis — the final voice the user sees. Forge the rigor, the edge, and the hardening in the work so far into one clean, coherent, finished deliverable. Preserve all three: keep what is correct, keep what is sharp, keep what survived attack. Do not blend into bland mush or average into a gray median — keep the edges. Resolve conflicts in favor of the user's real goal.\n\n${skillPrompt("judge")}\n\nReturn the single polished deliverable in Markdown. ${noWrap} Also forbidden: re-opening settled debates, adding new untested ideas, or flattening distinct strengths.\n\nIf sources are provided below, keep inline [n] citations for sourced claims.\n\n${grounding}`,
+        prompt: `Original request:\n${prompt}\n\nThe work so far (rigorous, sharpened, hardened) to finalize:\n${adversaryText}`,
+        maxTokens: 2200,
+        signal,
+      },
+      (piece) => emit({ type: "delta", text: piece })
+    );
+    synthesisText = synthesis.text;
+    synthesisCost = synthesis.cost ?? 0;
+  } catch {
+    /* fall back to the hardened draft */
+  }
+  if (!synthesisText) synthesisText = adversaryText;
   complete("judge", emit);
 
   const costBreakdown = [
     { node: "Architect", cost: opener.cost ?? 0 },
-    { node: "Maverick", cost: maverick.cost ?? 0 },
-    { node: "Adversary", cost: adversary.cost ?? 0 },
-    { node: "Synthesis", cost: synthesis.cost ?? 0 },
+    { node: "Maverick", cost: maverickCost },
+    { node: "Adversary", cost: adversaryCost },
+    { node: "Synthesis", cost: synthesisCost },
   ];
   emit({
     type: "cost",
@@ -151,7 +178,7 @@ export async function runMagiPipeline(
   });
 
   // Append the real Sources list (guarantees genuine URLs even if the model omits them).
-  const clean = cleanFinalAnswer(synthesis.text) + (sourcesList ? `\n\n${sourcesList}` : "");
+  const clean = cleanFinalAnswer(synthesisText) + (sourcesList ? `\n\n${sourcesList}` : "");
 
   activate("final", emit);
   emit({ type: "status", step: "final", message: "Final ruling released." });
