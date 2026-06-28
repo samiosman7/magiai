@@ -54,9 +54,11 @@ export async function runMagiPipeline(
   // cite [n] and verify against them. Fails soft to ungrounded (grounding stays "").
   let grounding = "";
   let sourcesList = "";
+  let sourceCount = 0;
   if (taskProfile.kind === "research" || taskProfile.kind === "analysis") {
     emit({ type: "status", step: "scan", message: "MAGI is researching sources..." });
     const results = await webSearch(prompt, 5);
+    sourceCount = results.length;
     const g = buildGrounding(results);
     grounding = g.block;
     sourcesList = g.sourcesList;
@@ -177,8 +179,16 @@ export async function runMagiPipeline(
     breakdown: costBreakdown,
   });
 
-  // Append the real Sources list (guarantees genuine URLs even if the model omits them).
-  const clean = cleanFinalAnswer(synthesisText) + (sourcesList ? `\n\n${sourcesList}` : "");
+  // Strip fabricated citations ([n] pointing past the real source count) so "cited"
+  // never references a source that doesn't exist; then append the real Sources list.
+  let body = cleanFinalAnswer(synthesisText);
+  if (sourceCount > 0) {
+    body = body.replace(/\[(\d+)\]/g, (m, d) => {
+      const n = Number(d);
+      return n >= 1 && n <= sourceCount ? m : "";
+    });
+  }
+  const clean = body + (sourcesList ? `\n\n${sourcesList}` : "");
 
   activate("final", emit);
   emit({ type: "status", step: "final", message: "Final ruling released." });

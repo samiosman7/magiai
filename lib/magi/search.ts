@@ -2,11 +2,19 @@ import "server-only";
 
 export type SearchResult = { title: string; url: string; content: string };
 
+// Small in-memory TTL cache so identical queries don't re-hit Tavily (cost + latency).
+const searchCache = new Map<string, { at: number; results: SearchResult[] }>();
+const SEARCH_TTL_MS = 5 * 60 * 1000;
+
 // Tavily web search (built for LLM grounding). Returns clean extracted content.
 // Fails soft: returns [] if no key or on any error, so the pipeline can proceed ungrounded.
 export async function webSearch(query: string, maxResults = 5): Promise<SearchResult[]> {
   const key = process.env.TAVILY_API_KEY;
   if (!key || !query.trim()) return [];
+
+  const cacheKey = `${maxResults}:${query.trim().toLowerCase()}`;
+  const hit = searchCache.get(cacheKey);
+  if (hit && Date.now() - hit.at < SEARCH_TTL_MS) return hit.results;
 
   try {
     const res = await fetch("https://api.tavily.com/search", {
@@ -23,13 +31,15 @@ export async function webSearch(query: string, maxResults = 5): Promise<SearchRe
     });
     if (!res.ok) return [];
     const data = (await res.json()) as { results?: Array<{ title?: string; url?: string; content?: string }> };
-    return (data.results ?? [])
+    const results = (data.results ?? [])
       .filter((r) => r.url)
       .map((r) => ({
         title: (r.title || r.url || "").slice(0, 160),
         url: r.url!,
         content: (r.content || "").slice(0, 600),
       }));
+    searchCache.set(cacheKey, { at: Date.now(), results });
+    return results;
   } catch {
     return [];
   }
