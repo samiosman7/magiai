@@ -4,6 +4,7 @@ import { buildMagiRuntimeContext } from "./runtime-context";
 import { skillLabels, skillPackPaths, skillPrompt } from "./skills";
 import { classifyTask, createPlannedArtifact } from "./task-router";
 import { webSearch, buildGrounding } from "./search";
+import { parseTriage, cleanFinalAnswer, stripDanglingCitations } from "./text-utils";
 import type { DifficultyResult, GeminiModel, JudgeResult, MagiEvent, MagiMode, PipelineStep } from "./types";
 
 type Emit = (event: MagiEvent) => void;
@@ -181,13 +182,7 @@ export async function runMagiPipeline(
 
   // Strip fabricated citations ([n] pointing past the real source count) so "cited"
   // never references a source that doesn't exist; then append the real Sources list.
-  let body = cleanFinalAnswer(synthesisText);
-  if (sourceCount > 0) {
-    body = body.replace(/\[(\d+)\]/g, (m, d) => {
-      const n = Number(d);
-      return n >= 1 && n <= sourceCount ? m : "";
-    });
-  }
+  const body = stripDanglingCitations(cleanFinalAnswer(synthesisText), sourceCount);
   const clean = body + (sourcesList ? `\n\n${sourcesList}` : "");
 
   activate("final", emit);
@@ -268,15 +263,6 @@ function quickAnswer(prompt: string): string | null {
 
 // Reads the opener's [SIMPLE]/[COMPLEX] tag and strips it from the body.
 // Defaults to COMPLEX when no tag is found, to protect the quality promise on real work.
-function parseTriage(text: string): { decision: "simple" | "complex" | "refuse"; body: string } {
-  const trimmed = text.trim();
-  const match = trimmed.match(/^\[?\s*(SIMPLE|COMPLEX|REFUSE)\s*\]?/i);
-  if (!match) return { decision: "complex", body: trimmed };
-  const tag = match[1].toUpperCase();
-  const decision = tag === "REFUSE" ? "refuse" : tag === "SIMPLE" ? "simple" : "complex";
-  const body = trimmed.slice(match[0].length).replace(/^[\s:\-–—]+/, "").trim();
-  return { decision, body: body || trimmed };
-}
 
 async function runJudgeLikeNode(
   mode: MagiMode,
@@ -342,29 +328,6 @@ function sharedObjection(casper: JudgeResult, judge: JudgeResult) {
 
 // Cheap builders sometimes emit the answer as a ```json {"final_answer": ...}``` envelope.
 // Unwrap it so the user sees clean prose/code, not the internal artifact structure.
-function cleanFinalAnswer(text: string): string {
-  const stripped = text.replace(/```(?:json)?/gi, "").trim();
-  const match = stripped.match(/\{[\s\S]*\}/);
-  for (const candidate of [stripped, match?.[0]]) {
-    if (!candidate) continue;
-    try {
-      const obj = JSON.parse(candidate) as {
-        final_answer?: unknown;
-        files_to_create?: Array<{ filename?: string; content?: string }>;
-      };
-      if (obj && typeof obj.final_answer === "string") {
-        let out = obj.final_answer.trim();
-        for (const f of obj.files_to_create ?? []) {
-          if (f?.filename && f?.content) out += `\n\n**${f.filename}**\n\`\`\`\n${f.content}\n\`\`\``;
-        }
-        return out;
-      }
-    } catch {
-      // not a JSON envelope — fall through
-    }
-  }
-  return text.trim();
-}
 
 function preview(text: string, limit = 260) {
   const compact = text.replace(/\s+/g, " ").trim();
