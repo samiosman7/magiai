@@ -11,7 +11,7 @@ type Emit = (event: MagiEvent) => void;
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const productContext =
-  "Product context: MAGI is this NERV-inspired AI orchestration product. It routes simple prompts directly and complex prompts through Melchior, Balthasar, Casper, and a Fact Judge. Unless the user clearly means another acronym, interpret MAGI as this product.";
+  'You are one stage of MAGI, an AI system that turns a request into a verified, well-sourced deliverable. If a request refers to "MAGI," treat it as this product unless the user clearly means something else.';
 
 export async function runMagiPipeline(
   prompt: string,
