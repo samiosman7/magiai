@@ -71,9 +71,9 @@ export async function runMagiPipeline(
   emit({ type: "status", step: "melchior", message: "MAGI is working..." });
   const opener = await generateText({
     ...getModelPlan(mode, "melchior", geminiModel),
-    system: `${productContext}\n\n${route}\n\nYou are Melchior, the Architect — and MAGI's first gate.\nFirst decide whether this request is SIMPLE (a direct factual or conversational reply fully satisfies it) or COMPLEX (it genuinely needs a rigorous, structured, multi-part deliverable).\n- If SIMPLE: answer it well and naturally. Do not inflate it into a report.\n- If COMPLEX: produce the rigorous, complete, by-the-book draft a meticulous domain expert would stake their reputation on — full structure, every part present, every claim sound, concrete and specific.\nIf the request is clearly harmful, illegal, or disallowed (malware, weapons, exploitation of minors, credible violence, self-harm facilitation, fraud), refuse instead of helping.\nBegin your reply with exactly one tag on its own first line: [SIMPLE], [COMPLEX], or [REFUSE]. For [REFUSE], add a brief one-sentence refusal; otherwise give the answer or the draft.\n\n${skillPrompt("melchior")}\n\n${mcp}\n\nOutput clean Markdown. ${noWrap}\n\n${grounding}`,
+    system: `${productContext}\n\n${route}\n\nYou are Melchior, the Architect — MAGI's first gate. You decide the request type and, for real work, design the blueprint the builder will follow. You do NOT write the final deliverable yourself.\nClassify, then act:\n- SIMPLE — a direct factual or conversational reply fully answers it. Answer it directly; do not pad it into a report.\n- COMPLEX — it needs a structured, multi-part deliverable. Output a PLAN, not prose: the exact sections/components it must contain, the must-have requirements (including ones the user implied but did not state), the approach to take, and the key facts or constraints to respect. Be complete — anything you leave out, the builder will not include.\n- REFUSE — clearly harmful or illegal (malware, weapons, exploitation of minors, credible violence, self-harm facilitation, fraud). Refuse in one sentence.\nBegin with exactly one tag on its own first line: [SIMPLE], [COMPLEX], or [REFUSE]. After the tag: the answer (SIMPLE), the plan (COMPLEX), or the one-sentence refusal (REFUSE).\n\n${skillPrompt("melchior")}\n\n${mcp}\n\nOutput clean Markdown. ${noWrap}\n\n${grounding}`,
     prompt: historyBlock ? `${historyBlock}Current request:\n${prompt}` : prompt,
-    maxTokens: 1600,
+    maxTokens: 900,
     signal,
   });
   complete("melchior", emit);
@@ -93,7 +93,7 @@ export async function runMagiPipeline(
     return;
   }
 
-  // COMPLEX → the opener is the Architect's draft; continue the chain.
+  // COMPLEX → the opener is the Architect's PLAN; the chain builds from it.
   const architectText = triage.body;
 
   // 2. Maverick — outside the box, builds on the Architect
@@ -107,8 +107,8 @@ export async function runMagiPipeline(
   try {
     const maverick = await generateText({
       ...getModelPlan(mode, "balthasar", geminiModel),
-      system: `${productContext}\n\n${route}\n\nYou are Balthasar, the Maverick. You receive the Architect's solid but safe draft and make it sharp. Find the non-obvious angle the Architect would never reach: the contrarian insight, the reframe, the bold move, the thing that makes this NOT sound like every other answer. ADD to the draft — keep all of its rigor and inject the edge it is missing. You are forbidden from merely polishing: every pass must introduce at least one genuinely fresh idea or differentiation.\n\n${skillPrompt("balthasar")}\n\n${mcp}\n\nReturn the COMPLETE improved deliverable in Markdown. ${noWrap} Also forbidden: deleting the Architect's substance for flair.\n\n${grounding}`,
-      prompt: `Original request:\n${prompt}\n\nArchitect's draft to build on:\n${architectText}`,
+      system: `${productContext}\n\n${route}\n\nYou are Balthasar, the Maverick — the builder. You receive the Architect's plan and write the actual deliverable from it: cover every section and requirement in the plan, in full, concrete prose (or code/tables as fitting). As you build, add what a conventional execution would miss — a sharper framing, a non-obvious insight, or a real differentiator — at least one, and only where it genuinely strengthens the work, never as decoration. Follow the plan's structure; do not drop its requirements.\n\n${skillPrompt("balthasar")}\n\n${mcp}\n\nReturn the COMPLETE deliverable in Markdown. ${noWrap}\n\n${grounding}`,
+      prompt: `Original request:\n${prompt}\n\nArchitect's plan to build from:\n${architectText}`,
       maxTokens: 1900,
       signal,
     });
@@ -124,21 +124,21 @@ export async function runMagiPipeline(
   activate("casper", emit);
   emit({ type: "skills", node: "Adversary", skills: skillLabels("casper"), sourcePath: skillPackPaths.casper });
   emit({ type: "status", step: "casper", message: "MAGI is working..." });
-  let adversaryText = maverickText;
+  let adversaryText = "";
   let adversaryCost = 0;
   try {
     const adversary = await generateText({
       ...getModelPlan(mode, "casper", geminiModel),
-      system: `${productContext}\n\n${route}\n\nYou are Casper, the Adversary. Attack the combined work as a skeptical customer, tough investor, or tired operator would. Where does it fall apart? What is fragile, naive, missing, or over-promised? Then HARDEN it: cut weak claims, fill holes, answer objections, ground the hype — while keeping the rigor and the edge.\n\n${skillPrompt("casper")}\n\n${mcp}\n\nReturn the COMPLETE hardened deliverable in Markdown. ${noWrap} Also forbidden: politeness, softening, or leaving known weaknesses unaddressed.\n\nIf sources are provided below, cut or flag any claim they do not support, and keep inline [n] citations.\n\n${grounding}`,
-      prompt: `Original request:\n${prompt}\n\nCurrent work to harden:\n${maverickText}`,
-      maxTokens: 1900,
+      system: `${productContext}\n\n${route}\n\nYou are Casper, the Adversary — a ruthless devil's advocate. You do NOT rewrite the deliverable. Read it as a skeptical customer, tough investor, and tired operator would, and output a sharp CRITIQUE: a numbered list of its real weaknesses — what is fragile, naive, unsupported, missing, or over-promised — and any claim the sources below do not support. Be specific; point to where each problem is. List only genuine problems; if something is solid, do not invent a complaint.\n\n${skillPrompt("casper")}\n\n${mcp}\n\nOutput ONLY the numbered critique — no rewritten deliverable, no preamble. ${noWrap}\n\n${grounding}`,
+      prompt: `Original request:\n${prompt}\n\nDeliverable to critique:\n${maverickText}`,
+      maxTokens: 800,
       signal,
     });
-    adversaryText = adversary.text || maverickText;
+    adversaryText = adversary.text || "";
     adversaryCost = adversary.cost ?? 0;
     emit({ type: "node", name: `Adversary (${adversary.provider})`, text: preview(adversary.text) });
   } catch {
-    /* keep the Maverick draft */
+    /* no critique; Synthesis just finalizes the build */
   }
   complete("casper", emit);
 
@@ -152,8 +152,8 @@ export async function runMagiPipeline(
     const synthesis = await generateTextStream(
       {
         ...getModelPlan(mode, "judge", geminiModel),
-        system: `${productContext}\n\n${route}\n\nYou are the Synthesis — the final voice the user sees. Forge the rigor, the edge, and the hardening in the work so far into one clean, coherent, finished deliverable. Preserve all three: keep what is correct, keep what is sharp, keep what survived attack. Do not blend into bland mush or average into a gray median — keep the edges. Resolve conflicts in favor of the user's real goal.\n\n${skillPrompt("judge")}\n\nReturn the single polished deliverable in Markdown. ${noWrap} Also forbidden: re-opening settled debates, adding new untested ideas, or flattening distinct strengths.\n\nIf sources are provided below, keep inline [n] citations for sourced claims.\n\n${grounding}`,
-        prompt: `Original request:\n${prompt}\n\nThe work so far (rigorous, sharpened, hardened) to finalize:\n${adversaryText}`,
+        system: `${productContext}\n\n${route}\n\nYou are the Synthesis — the final voice the user sees. You receive the builder's deliverable and the Adversary's critique. Produce the finished deliverable: keep everything strong in the build, and FIX every valid point in the critique — correct or remove unsupported claims, fill the gaps, answer the objections. Ignore critique points that are wrong or pedantic. Read as one confident author.\n\n${skillPrompt("judge")}\n\nReturn ONLY the single finished deliverable in Markdown — not a list of changes, not the critique. ${noWrap} If sources are provided below, keep inline [n] citations for sourced claims.\n\n${grounding}`,
+        prompt: `Original request:\n${prompt}\n\nDeliverable:\n${maverickText}\n\nAdversary critique to resolve (fix valid points, ignore wrong ones):\n${adversaryText || "(no critique returned — finalize the deliverable as-is)"}`,
         maxTokens: 2200,
         signal,
       },
@@ -162,9 +162,9 @@ export async function runMagiPipeline(
     synthesisText = synthesis.text;
     synthesisCost = synthesis.cost ?? 0;
   } catch {
-    /* fall back to the hardened draft */
+    /* fall back to the builder's deliverable */
   }
-  if (!synthesisText) synthesisText = adversaryText;
+  if (!synthesisText) synthesisText = maverickText;
   complete("judge", emit);
 
   const costBreakdown = [
