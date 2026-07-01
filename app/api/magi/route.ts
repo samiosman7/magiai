@@ -95,6 +95,13 @@ export async function POST(request: Request) {
     });
   }
 
+  const reqId = crypto.randomUUID().slice(0, 8);
+  const startedAt = Date.now();
+  // Structured server logs (greppable in Vercel): one line per lifecycle event.
+  const log = (event: string, extra: Record<string, unknown> = {}) =>
+    console.log(JSON.stringify({ t: `magi.${event}`, reqId, mode, ...extra }));
+  log("start", { promptLen: prompt.length });
+
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
@@ -117,13 +124,17 @@ export async function POST(request: Request) {
         });
         await runMagiPipeline(prompt, mode, emit, geminiModel, request.signal, history);
         succeeded = true;
-      } catch {
+      } catch (error) {
         // Graceful failure: clean user-facing message, and don't charge for a broken run.
+        console.error(
+          JSON.stringify({ t: "magi.error", reqId, mode, message: error instanceof Error ? error.message : "unknown" })
+        );
         emit({
           type: "final",
           answer: "MAGI couldn't finish this request. You haven't been charged — please try again.",
         });
       } finally {
+        log("done", { succeeded, costUsd: Number(runCostUsd.toFixed(6)), ms: Date.now() - startedAt });
         await recordRunAndChargeCredits({
           clerkUserId: userId,
           mode,
