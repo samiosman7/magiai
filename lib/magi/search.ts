@@ -26,17 +26,21 @@ export async function webSearch(query: string, maxResults = 5): Promise<SearchRe
         max_results: maxResults,
         search_depth: "basic",
         include_answer: false,
+        include_raw_content: true, // fuller page text so verification has real evidence, not a snippet
       }),
       signal: AbortSignal.timeout(12000),
     });
     if (!res.ok) return [];
-    const data = (await res.json()) as { results?: Array<{ title?: string; url?: string; content?: string }> };
+    const data = (await res.json()) as {
+      results?: Array<{ title?: string; url?: string; content?: string; raw_content?: string }>;
+    };
     const results = (data.results ?? [])
       .filter((r) => r.url)
       .map((r) => ({
         title: (r.title || r.url || "").slice(0, 160),
         url: r.url!,
-        content: (r.content || "").slice(0, 600),
+        // Prefer fuller extracted page text; cap to bound tokens/cost across sources.
+        content: (r.raw_content || r.content || "").replace(/\s+/g, " ").trim().slice(0, 1200),
       }));
     searchCache.set(cacheKey, { at: Date.now(), results });
     return results;
