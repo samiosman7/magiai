@@ -68,3 +68,24 @@ confirm a capped/blocked run shows the clean capacity message.
   copy + `.md` export, mobile layout, onboarding examples, dev panels hidden (`?dev=1` to show).
 - **Legal:** `/terms` + `/privacy`.
 - **Billing code:** credit checks, deduction, Stripe checkout + webhook (inert until configured above).
+
+---
+
+## Reliability (added — Fable 5 session)
+- **CI**: `.github/workflows/ci.yml` runs typecheck + `vitest` + build on every push/PR. Keep it green — it's the gate before auto-deploy.
+- **Tests**: `npm test` (vitest). Covers text-utils + spend-cap logic. Add tests with new logic.
+- **Logs**: `/api/magi` emits structured `magi.start` / `magi.done` / `magi.error` lines (request id, mode, cost, latency) — greppable in Vercel logs.
+
+## Full env-var reference
+| Var | Purpose |
+| --- | --- |
+| `AI_GATEWAY_API_KEY` | model calls (Vercel AI Gateway) |
+| `NEXT_PUBLIC_SUPABASE_URL` / `SUPABASE_SECRET_KEY` | Supabase (server) |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | **needed for real auth** (not yet wired) |
+| `TAVILY_API_KEY` | grounding / sources |
+| `MAGI_BETA_CODE` | locks `/console` (unset = open) |
+| `MAGI_DAILY_USD_CAP` / `MAGI_USER_DAILY_USD_CAP` | daily $ caps (default 25 / 2) |
+| `MAGI_USER_DAILY_RUNS` | per-user daily run cap (default 50) |
+| `MAGI_EMERGENCY_STOP` | `true` halts all complex runs |
+| `MAGI_STREAM_IDLE_MS` | stalled-stream abort (default 30000) |
+| `MAGI_REQUIRE_BILLING` + `STRIPE_*` | activate charging (code ready) |
