@@ -23,36 +23,46 @@ export default function Access() {
   }
 
   return (
-    <main className="lp">
+    <main className="lp gate-page">
       <nav className="lp-nav">
-        <Link href="/" className="lp-mark">MAGI</Link>
+        <Link href="/" className="lp-lockup">
+          <span className="lp-mark-box" aria-hidden="true">MAGI</span>
+          <span className="lp-mark-sub">Decision system</span>
+        </Link>
         <span className="lp-tag">Private beta</span>
       </nav>
-      <header className="lp-hero">
-        <p className="lp-eyebrow">Beta access</p>
-        <h1>Enter your access code.</h1>
-        <p className="lp-sub">
-          MAGI is in private beta. Enter the code from your invite to continue.
-        </p>
-        <form className="lp-form" onSubmit={submit}>
-          <input
-            type="text"
-            required
-            placeholder="Access code"
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            aria-label="Access code"
-            disabled={status === "loading"}
-          />
-          <button type="submit" disabled={status === "loading"}>
-            {status === "loading" ? "Checking…" : "Enter"}
-          </button>
-        </form>
-        {status === "error" && <p className="lp-error">Invalid code. Check your invite or join the waitlist.</p>}
-        <p className="lp-micro">
-          No code yet? <Link href="/" style={{ color: "var(--blue)" }}>Join the waitlist</Link>.
-        </p>
-      </header>
+
+      <div className="gate-wrap">
+        <div className="gate">
+          <p className="gate-kicker">Security gate · clearance required</p>
+          <h1>Enter your access code.</h1>
+          <p className="gate-sub">
+            MAGI is in private beta. Enter the code from your invite to open the console.
+          </p>
+          <form className="gate-form" onSubmit={submit}>
+            <input
+              type="text"
+              required
+              placeholder="ACCESS CODE"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              aria-label="Access code"
+              autoComplete="off"
+              spellCheck={false}
+              disabled={status === "loading"}
+            />
+            <button type="submit" disabled={status === "loading"}>
+              {status === "loading" ? "Verifying…" : "Authenticate"}
+            </button>
+          </form>
+          {status === "error" && (
+            <p className="gate-error">Code rejected. Check your invite or join the waitlist.</p>
+          )}
+          <p className="gate-micro">
+            No code yet? <Link href="/">Join the waitlist</Link>.
+          </p>
+        </div>
+      </div>
     </main>
   );
 }

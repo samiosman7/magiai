@@ -3,17 +3,77 @@
 import { FormEvent, useState } from "react";
 import Link from "next/link";
 
-const ANGLES = [
-  { n: "01", name: "Architect", desc: "Builds the rigorous draft from real, current sources — not the model's memory." },
-  { n: "02", name: "Maverick", desc: "Finds the angle and the insight a generic answer would miss." },
-  { n: "03", name: "Adversary", desc: "Attacks every claim against the sources and cuts anything that doesn't hold up." },
-  { n: "04", name: "Synthesis", desc: "Forges one clean, cited report you can put your name on." },
+const NODES = [
+  {
+    code: "MELCHIOR·01",
+    name: "Architect",
+    desc: "Reads your request, pulls live sources, and drafts the blueprint — the exact sections, requirements, and constraints the answer must satisfy.",
+  },
+  {
+    code: "BALTHASAR·02",
+    name: "Maverick",
+    desc: "Builds the full deliverable from the blueprint — and adds the sharper framing a generic answer would miss.",
+  },
+  {
+    code: "CASPER·03",
+    name: "Adversary",
+    desc: "Attacks the draft like a skeptical investor. Every claim is checked against the sources; anything unsupported gets flagged.",
+  },
+  {
+    code: "SYNTHESIS",
+    name: "Judge",
+    desc: "Resolves every valid objection and forges one clean, cited report you can put your name on.",
+  },
 ];
 
-const PROOF = [
-  { h: "Grounded, not guessed", p: "MAGI researches live sources and your own documents, then answers from them — so it's current and specific to you." },
-  { h: "Verified against the truth", p: "Every claim is checked against the sources it found, not the model's memory. Unsupported claims get cut before you ever see them." },
-  { h: "A finished deliverable", p: "You get a cited, defensible report — not a chat bubble to copy-paste and reformat at midnight." },
+const DEMO_LINES = [
+  { t: "cmd", text: 'magi run "Competitive analysis: top 3 meal-kit companies"' },
+  { t: "log", label: "TASK ROUTED", text: "analysis · grounded · 5 live sources pulled" },
+  { t: "log", label: "MELCHIOR·01", text: "blueprint drafted — 6 sections, 14 requirements" },
+  { t: "log", label: "BALTHASAR·02", text: "deliverable built — differentiator added" },
+  { t: "warn", label: "CASPER·03", text: "critique: 3 unsupported claims flagged" },
+  { t: "log", label: "SYNTHESIS", text: "claims fixed · citations verified [1]–[5]" },
+  { t: "done", label: "VERDICT", text: "The Magi has decided — delivered in 41s · $0.007" },
+];
+
+const VS = {
+  chatbot: {
+    title: "A chatbot",
+    points: [
+      "Answers from the model's memory — often months stale",
+      "Sounds equally confident whether it's right or wrong",
+      "No one checks the answer before you see it",
+      "Hands you a chat bubble to reformat at midnight",
+    ],
+  },
+  magi: {
+    title: "MAGI",
+    points: [
+      "Researches live sources and cites them inline",
+      "Red-teams its own answer against those sources",
+      "Unsupported claims are cut before you ever see them",
+      "Delivers a finished, exportable document — with its exact cost",
+    ],
+  },
+};
+
+const FAQ = [
+  {
+    q: "What is MAGI?",
+    a: "MAGI is a self-verifying AI work engine. One prompt runs through four adversarial nodes — research, build, attack, synthesize — and returns a single cited deliverable instead of a chat reply.",
+  },
+  {
+    q: "How is it different from ChatGPT or Claude?",
+    a: "A single model answers once, from memory, with no one checking it. MAGI grounds the answer in live sources, then a dedicated adversary node attacks every claim against those sources before the final verdict is forged. You see citations, not vibes.",
+  },
+  {
+    q: "What does it cost?",
+    a: "The private beta is free for invited users. Every run shows its exact model cost down to the fraction of a cent — most runs land under a penny on Standard. Paid credit packs arrive at launch.",
+  },
+  {
+    q: "When do I get access?",
+    a: "We onboard the waitlist in small waves so every operator gets real capacity. Join now and you'll receive an access code by email when your wave opens.",
+  },
 ];
 
 export default function Waitlist() {
@@ -45,104 +105,168 @@ export default function Waitlist() {
     }
   }
 
+  const form =
+    status === "done" ? (
+      <div className="lp-success" role="status">
+        <span className="lp-success-code">ACCESS REQUEST LOGGED</span>
+        <strong>You&rsquo;re on the list.</strong>
+        <span>We&rsquo;ll email your access code the moment your wave opens.</span>
+      </div>
+    ) : (
+      <form className="lp-form" onSubmit={submit}>
+        <input
+          type="email"
+          required
+          placeholder="you@work.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          aria-label="Email address"
+          disabled={status === "loading"}
+        />
+        <button type="submit" disabled={status === "loading"}>
+          {status === "loading" ? "Transmitting…" : "Request access"}
+        </button>
+      </form>
+    );
+
   return (
     <main className="lp">
       <nav className="lp-nav">
-        <span className="lp-mark">MAGI</span>
-        <span className="lp-tag">Private beta</span>
+        <span className="lp-lockup">
+          <span className="lp-mark-box" aria-hidden="true">MAGI</span>
+          <span className="lp-mark-sub">Decision system</span>
+        </span>
+        <span className="lp-nav-right">
+          <span className="lp-tag">Private beta</span>
+          <Link className="lp-nav-link" href="/access">
+            Have a code? →
+          </Link>
+        </span>
       </nav>
 
       <header className="lp-hero">
-        <p className="lp-eyebrow">The AI that fact-checks itself</p>
-        <h1>Answers you can actually defend.</h1>
+        <p className="lp-eyebrow">Self-verifying AI · four nodes · one verdict</p>
+        <h1>
+          Answers you can <em>actually defend.</em>
+        </h1>
         <p className="lp-sub">
-          MAGI researches real sources, red-teams its own answer against them, and hands you a
-          cited report — built for the work where being wrong is expensive.
+          MAGI runs your request through four adversarial AI nodes — it researches real sources,
+          builds the deliverable, red-teams its own work, and hands you one cited report.
+          Built for the work where being wrong is expensive.
         </p>
 
-        {status === "done" ? (
-          <div className="lp-success" role="status">
-            <strong>You&rsquo;re on the list.</strong>
-            <span>We&rsquo;ll email you the moment your access opens.</span>
-          </div>
-        ) : (
-          <form className="lp-form" onSubmit={submit}>
-            <input
-              type="email"
-              required
-              placeholder="you@work.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              aria-label="Email address"
-              disabled={status === "loading"}
-            />
-            <button type="submit" disabled={status === "loading"}>
-              {status === "loading" ? "Joining…" : "Request access"}
-            </button>
-          </form>
-        )}
+        {form}
         {status === "error" && <p className="lp-error">{message}</p>}
-        {status !== "done" && <p className="lp-micro">Join the waitlist. No spam, no noise.</p>}
+        {status !== "done" && (
+          <p className="lp-micro">Onboarding in small waves. No spam — one email when your access opens.</p>
+        )}
+
+        <div className="lp-demo" aria-label="Example MAGI run">
+          <div className="lp-demo-bar">
+            <span className="lp-demo-dot" />
+            <span className="lp-demo-dot" />
+            <span className="lp-demo-dot" />
+            <span className="lp-demo-title">magi://console — run 0x2A7F</span>
+            <span className="lp-demo-live">● LIVE</span>
+          </div>
+          <div className="lp-demo-body">
+            {DEMO_LINES.map((line, i) => (
+              <p
+                className={`lp-demo-line ${line.t}`}
+                style={{ animationDelay: `${0.35 + i * 0.55}s` }}
+                key={i}
+              >
+                {line.t === "cmd" ? (
+                  <>
+                    <span className="lp-demo-prompt">$</span> {line.text}
+                  </>
+                ) : (
+                  <>
+                    <span className="lp-demo-label">{line.label}</span>
+                    {line.text}
+                  </>
+                )}
+              </p>
+            ))}
+            <p className="lp-demo-caret" style={{ animationDelay: `${0.35 + DEMO_LINES.length * 0.55}s` }}>
+              <span />
+            </p>
+          </div>
+        </div>
       </header>
 
-      <section className="lp-section">
-        <h2>One prompt. Four minds. One report you can trust.</h2>
-        <div className="lp-angles">
-          {ANGLES.map((a) => (
-            <div className="lp-angle" key={a.name}>
-              <span className="lp-angle-n">{a.n}</span>
-              <strong>{a.name}</strong>
-              <p>{a.desc}</p>
+      <section className="lp-section" id="system">
+        <p className="lp-section-kicker">The system</p>
+        <h2>One prompt. Four minds. One verdict.</h2>
+        <p className="lp-section-sub">
+          Every complex request passes through four specialist nodes that build on — and attack — each other.
+        </p>
+        <div className="lp-nodes">
+          {NODES.map((node, i) => (
+            <div className="lp-node" key={node.code}>
+              <div className="lp-node-head">
+                <span className="lp-node-code">{node.code}</span>
+                <span className="lp-node-index">{String(i + 1).padStart(2, "0")}</span>
+              </div>
+              <strong>{node.name}</strong>
+              <p>{node.desc}</p>
             </div>
           ))}
         </div>
       </section>
 
       <section className="lp-section">
+        <p className="lp-section-kicker">The difference</p>
         <h2>Why not just use ChatGPT?</h2>
-        <div className="lp-proof">
-          {PROOF.map((p) => (
-            <div className="lp-proof-card" key={p.h}>
-              <strong>{p.h}</strong>
-              <p>{p.p}</p>
-            </div>
+        <div className="lp-vs">
+          <div className="lp-vs-col">
+            <span className="lp-vs-title">{VS.chatbot.title}</span>
+            <ul>
+              {VS.chatbot.points.map((p) => (
+                <li key={p}>{p}</li>
+              ))}
+            </ul>
+          </div>
+          <div className="lp-vs-col magi">
+            <span className="lp-vs-title">{VS.magi.title}</span>
+            <ul>
+              {VS.magi.points.map((p) => (
+                <li key={p}>{p}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section className="lp-section">
+        <p className="lp-section-kicker">Questions</p>
+        <h2>Before you ask.</h2>
+        <div className="lp-faq">
+          {FAQ.map((item) => (
+            <details key={item.q}>
+              <summary>{item.q}</summary>
+              <p>{item.a}</p>
+            </details>
           ))}
         </div>
       </section>
 
       <section className="lp-cta">
-        <h2>Get early access.</h2>
-        <p>We&rsquo;re onboarding the first users now.</p>
-        {status === "done" ? (
-          <div className="lp-success" role="status">
-            <strong>You&rsquo;re on the list.</strong>
-            <span>Check your inbox soon.</span>
-          </div>
-        ) : (
-          <form className="lp-form" onSubmit={submit}>
-            <input
-              type="email"
-              required
-              placeholder="you@work.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              aria-label="Email address"
-              disabled={status === "loading"}
-            />
-            <button type="submit" disabled={status === "loading"}>
-              {status === "loading" ? "Joining…" : "Request access"}
-            </button>
-          </form>
-        )}
+        <p className="lp-eyebrow">Access request</p>
+        <h2>Get your access code.</h2>
+        <p>We&rsquo;re onboarding the first operators now. Early waves get free runs and a direct line to the builder.</p>
+        {form}
+        {status === "error" && <p className="lp-error">{message}</p>}
       </section>
 
       <footer className="lp-footer">
-        <span className="lp-mark">MAGI</span>
+        <span className="lp-mark-box small" aria-hidden="true">MAGI</span>
         <span className="lp-footer-links">
           <Link href="/terms">Terms</Link>
           <Link href="/privacy">Privacy</Link>
+          <Link href="/access">Beta access</Link>
         </span>
-        <span>The Magi has decided.</span>
+        <span className="lp-footer-tag">The Magi has decided.</span>
       </footer>
     </main>
   );

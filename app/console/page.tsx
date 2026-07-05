@@ -112,13 +112,13 @@ type MagiEvent =
 type RunCost = { total: number; mode: string; breakdown: Array<{ node: string; cost: number }> };
 
 const pipelineItems: Array<{ step: PipelineStep; label: string }> = [
-  { step: "scan", label: "Difficulty scan" },
-  { step: "route", label: "Task router" },
-  { step: "melchior", label: "Architect — by the book" },
-  { step: "balthasar", label: "Maverick — outside the box" },
-  { step: "casper", label: "Adversary — red-team" },
+  { step: "scan", label: "Signal scan" },
+  { step: "route", label: "Task routing" },
+  { step: "melchior", label: "Melchior·01 — Architect" },
+  { step: "balthasar", label: "Balthasar·02 — Maverick" },
+  { step: "casper", label: "Casper·03 — Adversary" },
   { step: "judge", label: "Synthesis — final forge" },
-  { step: "final", label: "Decision released" },
+  { step: "final", label: "Verdict released" },
 ];
 
 const initialSteps = Object.fromEntries(
@@ -133,11 +133,11 @@ const modeInfo: Record<ModeKey, { label: string; models: string; cost: string; b
   premium: { label: "Premium", models: "Gemini 3.1 Pro · GPT-5.5 · Sonnet 4.6", cost: "~$0.05", blurb: "Frontier models" },
 };
 
-const heroRoles: Array<{ name: string; desc: string }> = [
-  { name: "Architect", desc: "drafts it by the book" },
-  { name: "Maverick", desc: "adds the bold angle" },
-  { name: "Adversary", desc: "attacks & hardens it" },
-  { name: "Synthesis", desc: "forges the final answer" },
+const heroRoles: Array<{ code: string; name: string; desc: string }> = [
+  { code: "MELCHIOR·01", name: "Architect", desc: "drafts the blueprint by the book" },
+  { code: "BALTHASAR·02", name: "Maverick", desc: "builds it with the bold angle" },
+  { code: "CASPER·03", name: "Adversary", desc: "attacks every weak claim" },
+  { code: "SYNTHESIS", name: "Judge", desc: "forges the final verdict" },
 ];
 
 const examplePrompts = [
@@ -645,11 +645,11 @@ export default function Home() {
           <div className="brand-lockup">
             <span className="nerv-mark" aria-hidden="true">MAGI</span>
             <div>
-              <p className="kicker">{modeLabel}</p>
-              <h1>The Magi has decided.</h1>
+              <p className="kicker">Decision system · {modeLabel}</p>
+              <h1>Console</h1>
             </div>
           </div>
-          <div className="signal" aria-label="System status">
+          <div className={`signal ${isRunning ? "busy" : ""}`} aria-label="System status">
             <span />
             {isRunning ? "Deliberating" : "Ready"}
           </div>
@@ -662,16 +662,16 @@ export default function Home() {
         <section className="console" aria-live="polite">
           {!hasMessages && (
             <div className="empty-state">
-              <p className="hero-kicker">Multi-model work engine</p>
-              <h2>One prompt. Four expert minds. One answer.</h2>
+              <p className="hero-kicker">MAGI system · 4 nodes on line</p>
+              <h2>One prompt. Four minds. One verdict.</h2>
               <p className="hero-sub">
                 MAGI routes your request through four specialists — each building on the last —
-                then hands back a single, polished result. No model-picking, no prompt-wrangling.
+                then hands back a single, cited result. No model-picking, no prompt-wrangling.
               </p>
               <ol className="hero-flow" aria-label="How MAGI works">
-                {heroRoles.map((role, index) => (
+                {heroRoles.map((role) => (
                   <li key={role.name}>
-                    <span className="hero-step-num">{index + 1}</span>
+                    <span className="hero-step-code">{role.code}</span>
                     <strong>{role.name}</strong>
                     <span>{role.desc}</span>
                   </li>
@@ -700,6 +700,7 @@ export default function Home() {
               <article className={`message ${message.kind}`} key={message.id}>
                 {message.kind === "magi" ? (
                   <>
+                    <span className="msg-tag" aria-hidden="true">MAGI · verdict</span>
                     <div
                       className="message-md"
                       dangerouslySetInnerHTML={{ __html: renderMarkdown(message.text) }}
@@ -776,7 +777,7 @@ export default function Home() {
       <aside className="dossier" aria-label="Decision dossier">
         <div className="panel-head">
           <div>
-            <p className="kicker">NERV dossier</p>
+            <p className="kicker">System dossier</p>
             <h2>Run trace</h2>
           </div>
           <button className="ghost" type="button" onClick={resetRun}>
