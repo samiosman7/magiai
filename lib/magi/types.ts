@@ -47,18 +47,6 @@ export type ModelResult = {
   cost?: number; // actual billed USD for this call, when the provider reports it
 };
 
-export type DifficultyResult = {
-  complex: boolean;
-  score: number;
-  reason: string;
-};
-
-export type JudgeResult = {
-  passed: boolean;
-  issue: string | null;
-  rationale: string;
-};
-
 export type TaskKind =
   | "general"
   | "coding"
