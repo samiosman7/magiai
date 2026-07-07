@@ -53,13 +53,24 @@ Remaining config (Supabase Dashboard → Authentication):
   beta, but plug in custom SMTP (e.g. Resend free tier) before real volume.
 - Vercel env: add `NEXT_PUBLIC_SUPABASE_ANON_KEY` (already in `.env.local` locally).
 
-### 5. Stripe (code is done — just configure)
-- In Stripe: create products + prices for the credit packs.
+### 5. Stripe subscriptions (code is done — just configure)
+Plans are **monthly subscriptions** (defined in `lib/billing/plans.ts`):
+Free $0 (10 credits/mo, 20 runs/day, no premium routing) · Pro $15/mo (200 credits,
+100 runs/day) · Studio $40/mo (600 credits, 300 runs/day). Credits **reset** to the
+allowance each cycle (Stripe invoice for paid; lazy 30-day roll for free).
+
+- In Stripe: create two products with **recurring monthly prices** ($15 Pro, $40 Studio).
 - Vercel env: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
-  `STRIPE_PRICE_STARTER`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_STUDIO`.
-- Set `MAGI_REQUIRE_BILLING=true` (enforces credits) and `MAGI_FREE_CREDITS` (e.g. `5`).
-- Point the Stripe webhook at `https://<domain>/api/stripe/webhook`.
-- Test in Stripe test mode first.
+  `STRIPE_PRICE_PRO`, `STRIPE_PRICE_STUDIO` (the recurring price ids).
+- Webhook at `https://<domain>/api/stripe/webhook` listening for:
+  `checkout.session.completed`, `invoice.paid`,
+  `customer.subscription.updated`, `customer.subscription.deleted`.
+- Enable the **customer portal** (Settings → Billing → Customer portal) —
+  "Manage billing" in the console uses it for cancel/upgrade/card changes.
+- Set `MAGI_REQUIRE_BILLING=true` to enforce credits + plan gates
+  (premium mode requires Pro; anonymous callers get 401 on runs/checkout).
+  `MAGI_FREE_CREDITS` optionally overrides the free monthly allowance.
+- Test in Stripe test mode first (test cards + `stripe listen` for the webhook).
 
 ### 6. Domain + final checks
 Point a domain at the Vercel project; verify `/`, `/access`, `/console` in prod;
@@ -97,4 +108,5 @@ confirm a capped/blocked run shows the clean capacity message.
 | `MAGI_USER_DAILY_RUNS` | per-user daily run cap (default 50) |
 | `MAGI_EMERGENCY_STOP` | `true` halts all complex runs |
 | `MAGI_STREAM_IDLE_MS` | stalled-stream abort (default 30000) |
-| `MAGI_REQUIRE_BILLING` + `STRIPE_*` | activate charging (code ready) |
+| `MAGI_REQUIRE_BILLING` + `STRIPE_*` | activate subscriptions (code ready) |
+| `MAGI_FREE_CREDITS` | override free plan's monthly credits (default 10) |

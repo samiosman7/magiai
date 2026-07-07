@@ -85,9 +85,16 @@ export async function POST(request: Request) {
     );
   }
 
-  // Spend guard: kill switch + daily caps, BEFORE any model call. Blocked => clean
-  // capacity message as a normal NDJSON stream (HTTP 200), never a raw error, zero spend.
-  const spend = await checkSpendLimits(userId);
+  // Spend guard: kill switch + daily caps, BEFORE any model call. Plan caps apply
+  // only once billing is enforced — during the free beta the env caps rule.
+  // Blocked => clean capacity message as a normal NDJSON stream (HTTP 200),
+  // never a raw error, zero spend.
+  const spend = await checkSpendLimits(
+    userId,
+    process.env.MAGI_REQUIRE_BILLING === "true"
+      ? { dailyRuns: creditCheck.plan.dailyRuns, dailyUsd: creditCheck.plan.dailyUsd }
+      : undefined
+  );
   if (!spend.allowed) {
     const body =
       `${JSON.stringify({ type: "status", step: "final", message: "Capacity" })}\n` +

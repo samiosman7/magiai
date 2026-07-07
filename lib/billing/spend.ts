@@ -17,7 +17,11 @@ function today() {
 
 export type SpendDecision = { allowed: boolean; reason?: string };
 
-export async function checkSpendLimits(userId: string): Promise<SpendDecision> {
+// Per-plan overrides for the per-user caps (from lib/billing/plans.ts).
+// Omitted (or partial) → env defaults, so anonymous/legacy callers keep working.
+export type PlanLimits = { dailyRuns?: number; dailyUsd?: number };
+
+export async function checkSpendLimits(userId: string, planLimits?: PlanLimits): Promise<SpendDecision> {
   if (process.env.MAGI_EMERGENCY_STOP === "true") {
     return { allowed: false, reason: "MAGI is paused for maintenance. Please try again shortly." };
   }
@@ -25,8 +29,8 @@ export async function checkSpendLimits(userId: string): Promise<SpendDecision> {
   if (!hasSupabaseConfig()) return { allowed: true };
 
   const globalCap = num(process.env.MAGI_DAILY_USD_CAP, 25);
-  const userCap = num(process.env.MAGI_USER_DAILY_USD_CAP, 2);
-  const userRunCap = num(process.env.MAGI_USER_DAILY_RUNS, 50);
+  const userCap = planLimits?.dailyUsd ?? num(process.env.MAGI_USER_DAILY_USD_CAP, 2);
+  const userRunCap = planLimits?.dailyRuns ?? num(process.env.MAGI_USER_DAILY_RUNS, 50);
 
   try {
     const supabase = getSupabaseAdmin();
@@ -56,6 +60,23 @@ export async function checkSpendLimits(userId: string): Promise<SpendDecision> {
     return { allowed: true };
   } catch {
     return { allowed: true };
+  }
+}
+
+// Today's usage for the console billing panel ("14 / 100 runs today").
+export async function getTodayUsage(userId: string): Promise<{ runsToday: number }> {
+  if (!hasSupabaseConfig()) return { runsToday: 0 };
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data } = await supabase
+      .from("magi_spend")
+      .select("run_count")
+      .eq("user_id", userId)
+      .eq("day", today())
+      .maybeSingle();
+    return { runsToday: Number(data?.run_count || 0) };
+  } catch {
+    return { runsToday: 0 };
   }
 }
 

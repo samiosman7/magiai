@@ -1,6 +1,6 @@
 import "server-only";
 
-import { ensureCreditProfile } from "@/lib/billing/credits";
+import { getBillingProfile } from "@/lib/billing/credits";
 import { hasSupabaseConfig, getSupabaseAdmin } from "@/lib/supabase/server";
 import type { MagiArtifact } from "@/lib/magi/types";
 import type { GeneratedProject } from "@/lib/projects/website-generator";
@@ -18,7 +18,8 @@ export async function saveArtifactPackage({
 }) {
   if (!hasSupabaseConfig()) return { saved: false };
 
-  await ensureCreditProfile(userId);
+  // Ensures the profile row exists (magi_artifacts references it).
+  await getBillingProfile(userId);
   const supabase = getSupabaseAdmin();
   const { error } = await supabase.from("magi_artifacts").insert({
     clerk_user_id: userId,

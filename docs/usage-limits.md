@@ -1,105 +1,50 @@
-# MAGI Usage Limit Model
+# MAGI Plans & Usage Limits
 
-Last updated: 2026-06-01
+Last updated: 2026-07-06 (supersedes the 2026-06-01 hidden-capacity proposal —
+decision: **visible credits and limits**, not Claude-style capacity states).
 
-MAGI should feel like Claude-style capacity management, not a visible credit arcade.
+## Plans (source of truth: `lib/billing/plans.ts`)
 
-## Product UX
+| Plan | Price | Credits/mo | Runs/day | $/day cap | Premium routing |
+| --- | --- | --- | --- | --- | --- |
+| Free | $0 | 10 | 20 | $0.50 | no |
+| Pro | $15/mo | 200 | 100 | $5 | yes |
+| Studio | $40/mo | 600 | 300 | $15 | yes |
 
-Users should normally see:
+Credit prices per run: economy 0.5 · standard 1 · premium 3 (+1 surcharge for
+prompts over 6k chars). Credits **reset** to the plan allowance each cycle —
+they do not accumulate.
 
-```text
-Capacity: Nominal
-```
+## Cycle mechanics
 
-When they approach limits:
+- **Paid plans**: the Stripe webhook is authoritative. `checkout.session.completed`
+  starts the plan, `invoice.paid` (subscription_cycle) resets credits monthly,
+  `customer.subscription.updated` handles plan switches, `…deleted` drops to free.
+  Paid cycles never reset lazily, so a missed webhook can't double-grant.
+- **Free plan**: no invoices, so the cycle rolls lazily — on first use after 30
+  days, credits reset to the allowance (`cycleExpired` in plans.ts).
 
-```text
-Capacity: Low
-MAGI may switch to efficient routing soon.
-```
+## Enforcement order on `/api/magi`
 
-When premium capacity is exhausted:
+1. `MAGI_REQUIRE_BILLING=true` + anonymous caller → 401 (sign in).
+2. Plan gate: premium mode on a free plan → blocked with upgrade message.
+3. Credit gate: balance < run estimate → blocked with reset/upgrade message.
+4. Spend guard (`checkSpendLimits`): kill switch → global $/day cap →
+   per-user $/day and runs/day using the **plan's** limits (env defaults for
+   anonymous callers). Blocked runs return a clean capacity message, never spend.
+5. Failed runs are never charged; real cost is still recorded for caps.
 
-```text
-Premium routing is unavailable until reset.
-Standard routing remains available.
-```
+## What users see
 
-When the full account limit is exhausted:
+- Console "Plan & usage" panel: plan name/price, credit meter (X / allowance),
+  runs-today meter (X / daily cap), reset date, upgrade + manage-billing buttons.
+- `/api/me` exposes the same snapshot (`billing.*`).
+- Landing page `#pricing` section shows the three tiers.
 
-```text
-Usage limit reached for this cycle.
-```
+## Hard safety backstops (env, unchanged)
 
-## Internal Metering
-
-Do not expose credits directly. Track hidden internal usage units and estimated provider cost.
-
-Suggested formula:
-
-```ts
-internalUsage =
-  estimatedInputTokens
-  + estimatedOutputTokens * 3
-  + attachmentTokens
-  + conversationContextTokens
-  + artifactMultiplier
-  + modelTierMultiplier
-  + toolCallMultiplier
-  + ensembleMultiplier
-```
-
-Also track estimated USD cost:
-
-```ts
-estimatedCostUsd =
-  providerInputCost
-  + providerOutputCost
-  + retryCost
-  + toolCost
-```
-
-## Routing States
-
-```ts
-if (usage < 70%) {
-  state = "nominal";
-  route = "cheap ensemble + flagship arbiter";
-}
-
-if (usage >= 70% && usage < 90%) {
-  state = "efficient";
-  route = "cheap ensemble + mid-tier arbiter";
-}
-
-if (usage >= 90% && usage < 100%) {
-  state = "conserve";
-  route = "single cheap model or cheap ensemble only";
-}
-
-if (usage >= 100%) {
-  state = "blocked";
-  route = "block premium/deep/artifact tasks";
-}
-```
-
-## Hard Safety Caps
-
-MAGI still needs strict backend protection:
-
-- per-user five-hour capacity
-- per-user daily capacity
-- per-user monthly capacity
-- global daily model spend cap
-- global monthly model spend cap
-- max prompt length
-- max output tokens
-- max retries
-- emergency kill switch
-
-## Claude-Like Principle
-
-Users do not manage credits. The system manages capacity.
-
-Internally, MAGI tracks exact cost and usage. Externally, users see only plan capacity states and clear blocks near limits.
+- `MAGI_EMERGENCY_STOP=true` — kill switch, blocks all runs
+- `MAGI_DAILY_USD_CAP` — global $/day across all users (default 25)
+- `MAGI_USER_DAILY_USD_CAP` / `MAGI_USER_DAILY_RUNS` — per-user fallbacks when
+  no plan is known (default 2 / 50)
+- Max prompt length 12k chars; in-memory hourly rate limiter as burst guard

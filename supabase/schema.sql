@@ -1,13 +1,26 @@
 create extension if not exists pgcrypto;
 
+-- plan: 'free' | 'pro' | 'studio'. Credits reset to the plan's monthly allowance
+-- each billing cycle (Stripe invoice for paid plans, lazy 30-day roll for free).
 create table if not exists public.magi_profiles (
   clerk_user_id text primary key,
   email text,
   plan text not null default 'free',
-  credits numeric(10, 2) not null default 5,
+  credits numeric(10, 2) not null default 10,
+  stripe_customer_id text,
+  stripe_subscription_id text,
+  cycle_started_at timestamptz not null default now(),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- Safe to re-run on an existing database (columns added after the first deploy).
+alter table public.magi_profiles add column if not exists stripe_customer_id text;
+alter table public.magi_profiles add column if not exists stripe_subscription_id text;
+alter table public.magi_profiles add column if not exists cycle_started_at timestamptz not null default now();
+
+create index if not exists magi_profiles_stripe_customer_idx
+  on public.magi_profiles(stripe_customer_id);
 
 create table if not exists public.magi_credit_events (
   id uuid primary key default gen_random_uuid(),

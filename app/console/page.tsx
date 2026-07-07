@@ -97,6 +97,19 @@ type ProviderStatus = {
   keyCount: number;
 };
 
+type BillingSnapshot = {
+  plan: string;
+  planName: string;
+  priceUsd: number;
+  credits: number;
+  monthlyCredits: number;
+  dailyRuns: number;
+  premiumRouting: boolean;
+  cycleResetsAt: string | null;
+  hasStripeCustomer: boolean;
+  runsToday: number;
+};
+
 type MagiEvent =
   | { type: "status"; step: PipelineStep; message: string }
   | { type: "node"; name: string; text: string }
@@ -186,6 +199,8 @@ export default function Home() {
   const [mockMode, setMockMode] = useState(false);
   const [operatorId, setOperatorId] = useState("");
   const [accountEmail, setAccountEmail] = useState<string | null>(null);
+  const [billing, setBilling] = useState<BillingSnapshot | null>(null);
+  const [billingEnforced, setBillingEnforced] = useState(false);
   const [mcpServers, setMcpServers] = useState<McpServerStatus[]>([]);
   const [mcpCatalog, setMcpCatalog] = useState<McpCatalogEntry[]>([]);
   const [isRunning, setIsRunning] = useState(false);
@@ -222,6 +237,22 @@ export default function Home() {
     await getSupabaseBrowser()?.auth.signOut();
     setAccountEmail(null);
   }
+
+  const refreshBilling = (opId: string) => {
+    if (!opId) return;
+    fetch("/api/me", { headers: { "x-magi-user-id": opId } })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: { billing?: BillingSnapshot | null; billingEnforced?: boolean } | null) => {
+        setBilling(data?.billing ?? null);
+        setBillingEnforced(Boolean(data?.billingEnforced));
+      })
+      .catch(() => null);
+  };
+
+  // Plan/credits snapshot: on load, when the account changes, and after each run.
+  useEffect(() => {
+    if (operatorId) refreshBilling(operatorId);
+  }, [operatorId, accountEmail]);
 
   useEffect(() => {
     const storedOperator = window.localStorage.getItem("magi.operatorId");
@@ -417,6 +448,7 @@ export default function Home() {
       }
     } finally {
       setIsRunning(false);
+      refreshBilling(operatorId);
     }
   }
 
@@ -647,16 +679,25 @@ export default function Home() {
     URL.revokeObjectURL(url);
   }
 
-  async function startCheckout(pack: "starter" | "pro" | "studio") {
+  async function startCheckout(plan: "pro" | "studio") {
     const response = await fetch("/api/stripe/checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-magi-user-id": operatorId },
-      body: JSON.stringify({ pack }),
+      body: JSON.stringify({ plan }),
     });
-    const data = (await response.json().catch(() => null)) as { url?: string; error?: string } | null;
+    const data = (await response.json().catch(() => null)) as {
+      url?: string;
+      error?: string;
+      signInRequired?: boolean;
+    } | null;
 
     if (response.ok && data?.url) {
       window.location.href = data.url;
+      return;
+    }
+
+    if (data?.signInRequired) {
+      window.location.href = "/login";
       return;
     }
 
@@ -667,6 +708,19 @@ export default function Home() {
         kind: "status",
         text: data?.error || "Checkout is not configured yet.",
       },
+    ]);
+  }
+
+  async function openBillingPortal() {
+    const response = await fetch("/api/stripe/portal", { method: "POST" });
+    const data = (await response.json().catch(() => null)) as { url?: string; error?: string } | null;
+    if (response.ok && data?.url) {
+      window.location.href = data.url;
+      return;
+    }
+    setMessages((current) => [
+      ...current,
+      { id: createId(), kind: "status", text: data?.error || "Billing portal is not available yet." },
     ]);
   }
 
@@ -932,26 +986,73 @@ export default function Home() {
           </div>
         </details>
 
-        {showDev && (
-        <details className="node-card">
-          <summary>Credits</summary>
-          <div className="billing-box">
-            <p>Operator id</p>
-            <code>{operatorId || "initializing"}</code>
-            <div className="billing-actions">
-              <button type="button" onClick={() => startCheckout("starter")}>
-                25 credits
-              </button>
-              <button type="button" onClick={() => startCheckout("pro")}>
-                120 credits
-              </button>
-              <button type="button" onClick={() => startCheckout("studio")}>
-                400 credits
-              </button>
+        <details className="node-card" open>
+          <summary>Plan &amp; usage</summary>
+          {billing ? (
+            <div className="plan-box">
+              <div className="plan-head">
+                <strong>{billing.planName}</strong>
+                <span>{billing.priceUsd > 0 ? `$${billing.priceUsd}/mo` : "$0"}</span>
+              </div>
+              <div className="plan-meter">
+                <div className="plan-meter-label">
+                  <span>Credits</span>
+                  <span>
+                    {billing.credits} / {billing.monthlyCredits}
+                  </span>
+                </div>
+                <div className="plan-bar">
+                  <span
+                    style={{
+                      width: `${Math.min(100, Math.round((billing.credits / Math.max(1, billing.monthlyCredits)) * 100))}%`,
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="plan-meter">
+                <div className="plan-meter-label">
+                  <span>Runs today</span>
+                  <span>
+                    {billing.runsToday} / {billing.dailyRuns}
+                  </span>
+                </div>
+                <div className="plan-bar">
+                  <span
+                    style={{
+                      width: `${Math.min(100, Math.round((billing.runsToday / Math.max(1, billing.dailyRuns)) * 100))}%`,
+                    }}
+                  />
+                </div>
+              </div>
+              {billing.cycleResetsAt && (
+                <p className="plan-reset">
+                  Credits reset {new Date(billing.cycleResetsAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                  {!billingEnforced && " · beta: runs are free, credits not enforced"}
+                </p>
+              )}
+              <div className="billing-actions">
+                {billing.plan !== "studio" && (
+                  <button type="button" onClick={() => startCheckout(billing.plan === "pro" ? "studio" : "pro")}>
+                    {billing.plan === "pro" ? "Upgrade — Studio $40/mo" : "Upgrade — Pro $15/mo"}
+                  </button>
+                )}
+                {billing.hasStripeCustomer && (
+                  <button type="button" onClick={openBillingPortal}>
+                    Manage billing
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="plan-box">
+              <p className="plan-reset">
+                {accountEmail
+                  ? "Plan data unavailable — Supabase tables not set up yet."
+                  : "Sign in to see your plan, credits, and limits."}
+              </p>
+            </div>
+          )}
         </details>
-        )}
 
         {showDev && (
         <details className="node-card" open>

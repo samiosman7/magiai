@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import Link from "next/link";
+import { plans } from "@/lib/billing/plans";
 
 const NODES = [
   {
@@ -57,6 +58,42 @@ const VS = {
   },
 };
 
+const TIERS = [
+  {
+    plan: plans.free,
+    tagline: "Kick the tires on real, verified answers.",
+    features: [
+      `${plans.free.monthlyCredits} credits every month`,
+      "Economy + Standard routing",
+      `Up to ${plans.free.dailyRuns} runs per day`,
+      "Cited sources on every research answer",
+    ],
+    featured: false,
+  },
+  {
+    plan: plans.pro,
+    tagline: "For people who put their name on the output.",
+    features: [
+      `${plans.pro.monthlyCredits} credits every month`,
+      "Premium frontier routing (GPT-5.5 · Gemini 3.1 · Sonnet 4.6)",
+      `Up to ${plans.pro.dailyRuns} runs per day`,
+      "Exportable deliverables + full run history",
+    ],
+    featured: true,
+  },
+  {
+    plan: plans.studio,
+    tagline: "Heavy, daily, team-grade usage.",
+    features: [
+      `${plans.studio.monthlyCredits} credits every month`,
+      "Everything in Pro",
+      `Up to ${plans.studio.dailyRuns} runs per day`,
+      "Priority capacity during peak load",
+    ],
+    featured: false,
+  },
+];
+
 const FAQ = [
   {
     q: "What is MAGI?",
@@ -68,7 +105,7 @@ const FAQ = [
   },
   {
     q: "What does it cost?",
-    a: "The private beta is free for invited users. Every run shows its exact model cost down to the fraction of a cent — most runs land under a penny on Standard. Paid credit packs arrive at launch.",
+    a: "Free gets you 10 credits a month. Pro is $15/mo for 200 credits and premium frontier routing; Studio is $40/mo for 600. A Standard run costs 1 credit, Premium 3 — and every run shows its exact model cost. During the invited beta, runs are free.",
   },
   {
     q: "When do I get access?",
@@ -144,7 +181,7 @@ export default function Waitlist() {
         </span>
       </nav>
 
-      <header className="lp-hero">
+      <header className="lp-hero" id="top">
         <p className="lp-eyebrow">Self-verifying AI · four nodes · one verdict</p>
         <h1>
           Answers you can <em>actually defend.</em>
@@ -236,6 +273,44 @@ export default function Waitlist() {
             </ul>
           </div>
         </div>
+      </section>
+
+      <section className="lp-section" id="pricing">
+        <p className="lp-section-kicker">Plans</p>
+        <h2>Pay for verdicts, not tokens.</h2>
+        <p className="lp-section-sub">
+          One credit ≈ one full four-node run. Every run shows its exact cost. Beta users run free.
+        </p>
+        <div className="lp-pricing">
+          {TIERS.map(({ plan, tagline, features, featured }) => (
+            <div className={`lp-price-card ${featured ? "featured" : ""}`} key={plan.id}>
+              {featured && <span className="lp-price-flag">Most popular</span>}
+              <span className="lp-price-name">{plan.name}</span>
+              <div className="lp-price-amount">
+                {plan.priceUsd > 0 ? (
+                  <>
+                    <strong>${plan.priceUsd}</strong>
+                    <span>/month</span>
+                  </>
+                ) : (
+                  <strong>$0</strong>
+                )}
+              </div>
+              <p className="lp-price-tagline">{tagline}</p>
+              <ul>
+                {features.map((f) => (
+                  <li key={f}>{f}</li>
+                ))}
+              </ul>
+              <a className="lp-price-cta" href="#top">
+                Join the waitlist
+              </a>
+            </div>
+          ))}
+        </div>
+        <p className="lp-pricing-note">
+          Billing activates at public launch — beta invitees keep free runs until then.
+        </p>
       </section>
 
       <section className="lp-section">
