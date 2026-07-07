@@ -1,5 +1,5 @@
 import Stripe from "stripe";
-import { getRequestUserId } from "@/lib/auth/user";
+import { accountRequired, getRequestUser } from "@/lib/auth/user";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,7 +34,12 @@ export async function POST(request: Request) {
   }
 
   const origin = request.headers.get("origin") || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-  const userId = getRequestUserId(request);
+  const user = await getRequestUser(request);
+  // Credits must land on a real account — never sell credits to a spoofable operator id.
+  if (accountRequired(user)) {
+    return Response.json({ error: "Sign in to buy credits." }, { status: 401 });
+  }
+  const userId = user.userId;
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
   const session = await stripe.checkout.sessions.create({
     mode: "payment",

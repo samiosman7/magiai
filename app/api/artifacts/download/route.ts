@@ -1,7 +1,7 @@
 import JSZip from "jszip";
 import { saveArtifactPackage } from "@/lib/artifacts/store";
 import { generateUniversalArtifactProject } from "@/lib/artifacts/universal-generator";
-import { getRequestUserId } from "@/lib/auth/user";
+import { getRequestUser } from "@/lib/auth/user";
 import type { GeminiModel, MagiArtifact, MagiMode } from "@/lib/magi/types";
 import { checkRateLimit, rateLimitResponse } from "@/lib/security/rate-limit";
 
@@ -30,7 +30,7 @@ const validGeminiModels = new Set([
 ]);
 
 export async function POST(request: Request) {
-  const userId = getRequestUserId(request);
+  const { userId } = await getRequestUser(request);
   const rateLimit = checkRateLimit({
     key: `artifact:${userId}`,
     limit: Number(process.env.MAGI_ARTIFACT_RATE_LIMIT || 20),

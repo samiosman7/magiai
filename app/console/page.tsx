@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
+import { getSupabaseBrowser } from "@/lib/supabase/client";
 
 marked.setOptions({ gfm: true, breaks: true });
 
@@ -184,6 +185,7 @@ export default function Home() {
   const [providers, setProviders] = useState<ProviderStatus[]>([]);
   const [mockMode, setMockMode] = useState(false);
   const [operatorId, setOperatorId] = useState("");
+  const [accountEmail, setAccountEmail] = useState<string | null>(null);
   const [mcpServers, setMcpServers] = useState<McpServerStatus[]>([]);
   const [mcpCatalog, setMcpCatalog] = useState<McpCatalogEntry[]>([]);
   const [isRunning, setIsRunning] = useState(false);
@@ -205,6 +207,21 @@ export default function Home() {
     if (mode === "premium") return "Premium MAGI";
     return "Standard MAGI";
   }, [mode]);
+
+  useEffect(() => {
+    const supabase = getSupabaseBrowser();
+    if (!supabase) return;
+    supabase.auth.getUser().then(({ data }) => setAccountEmail(data.user?.email ?? null));
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAccountEmail(session?.user?.email ?? null);
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  async function signOut() {
+    await getSupabaseBrowser()?.auth.signOut();
+    setAccountEmail(null);
+  }
 
   useEffect(() => {
     const storedOperator = window.localStorage.getItem("magi.operatorId");
@@ -347,6 +364,21 @@ export default function Home() {
         }),
         signal: controller.signal,
       });
+
+      if (response.status === 401) {
+        const data = (await response.json().catch(() => null)) as { signInRequired?: boolean } | null;
+        setMessages((current) => [
+          ...current,
+          {
+            id: createId(),
+            kind: "status",
+            text: data?.signInRequired
+              ? "Sign in required — open /login to run MAGI with your account."
+              : "Access denied. Re-enter your beta code at /access.",
+          },
+        ]);
+        return;
+      }
 
       if (!response.ok || !response.body) {
         throw new Error("MAGI route failed to respond.");
@@ -654,8 +686,19 @@ export default function Home() {
             {isRunning ? "Deliberating" : "Ready"}
           </div>
           <div className="auth-station" aria-label="Operator">
-            <small>Operator</small>
-            <strong>{operatorId ? operatorId.replace("operator-", "OP-").slice(0, 18) : "Linking"}</strong>
+            <small>{accountEmail ? "Account" : "Operator"}</small>
+            <strong>
+              {accountEmail ?? (operatorId ? operatorId.replace("operator-", "OP-").slice(0, 18) : "Linking")}
+            </strong>
+            {accountEmail ? (
+              <button type="button" className="auth-link" onClick={signOut}>
+                Sign out
+              </button>
+            ) : (
+              <a className="auth-link" href="/login">
+                Sign in →
+              </a>
+            )}
           </div>
         </header>
 

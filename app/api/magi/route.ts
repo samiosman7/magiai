@@ -1,6 +1,6 @@
 import { checkCreditAccess, recordRunAndChargeCredits } from "@/lib/billing/credits";
 import { checkSpendLimits, recordSpend } from "@/lib/billing/spend";
-import { getRequestUserId } from "@/lib/auth/user";
+import { accountRequired, getRequestUser } from "@/lib/auth/user";
 import { runMagiPipeline } from "@/lib/magi/pipeline";
 import type { GeminiModel, MagiEvent, MagiMode } from "@/lib/magi/types";
 import { checkRateLimit, rateLimitResponse } from "@/lib/security/rate-limit";
@@ -29,7 +29,12 @@ const validGeminiModels = new Set([
 ]);
 
 export async function POST(request: Request) {
-  const userId = getRequestUserId(request);
+  const user = await getRequestUser(request);
+  // With billing on, runs must be attributable to a real account before any spend.
+  if (accountRequired(user)) {
+    return Response.json({ error: "Sign in to run MAGI.", signInRequired: true }, { status: 401 });
+  }
+  const userId = user.userId;
   const rateLimit = checkRateLimit({
     key: `magi:${userId}`,
     limit: Number(process.env.MAGI_RUN_RATE_LIMIT || 30),

@@ -1,11 +1,11 @@
-import { getRequestUserId } from "@/lib/auth/user";
+import { getRequestUser } from "@/lib/auth/user";
 import { hasSupabaseConfig, getSupabaseAdmin } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const userId = getRequestUserId(request);
+  const { userId } = await getRequestUser(request);
 
   if (!hasSupabaseConfig()) {
     return Response.json({ artifacts: [], storage: "local-only" });

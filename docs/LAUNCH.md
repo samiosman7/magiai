@@ -38,11 +38,20 @@ harmful prompts refused, failed runs don't charge. Defensible private beta.
 
 Two things the code is waiting on:
 
-### 4. Real per-user auth — needs input from you
-The only remaining **code** gap. Give the assistant your **Supabase anon/publishable key**
-(`NEXT_PUBLIC_SUPABASE_ANON_KEY`) and pick email magic-link vs password. Then it wires
-Supabase Auth so credits/charges attach to real accounts (today they key off the access-gate
-identity). Cannot be built/tested without that key.
+### 4. Real per-user auth — CODE DONE (July 2026), configure in Supabase
+Supabase Auth is wired: `/login` offers **email+password (primary) and magic link**,
+sessions live in cookies, and every API route resolves the real account first
+(anonymous operator ids remain only while billing is off — with `MAGI_REQUIRE_BILLING=true`,
+`/api/magi` and Stripe checkout return 401 until the user signs in).
+
+Remaining config (Supabase Dashboard → Authentication):
+- **URL Configuration**: set Site URL to your prod domain and add
+  `https://<domain>/auth/callback` to Redirect URLs (magic links break without this).
+- **Sign In / Up**: email provider is on by default. Decide "Confirm email":
+  OFF = invited users start instantly; ON = they confirm first (needs working email).
+- **SMTP**: the built-in sender is rate-limited (~2-4 emails/hour) — fine for a tiny
+  beta, but plug in custom SMTP (e.g. Resend free tier) before real volume.
+- Vercel env: add `NEXT_PUBLIC_SUPABASE_ANON_KEY` (already in `.env.local` locally).
 
 ### 5. Stripe (code is done — just configure)
 - In Stripe: create products + prices for the credit packs.
@@ -81,7 +90,7 @@ confirm a capped/blocked run shows the clean capacity message.
 | --- | --- |
 | `AI_GATEWAY_API_KEY` | model calls (Vercel AI Gateway) |
 | `NEXT_PUBLIC_SUPABASE_URL` / `SUPABASE_SECRET_KEY` | Supabase (server) |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | **needed for real auth** (not yet wired) |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | real per-user auth (`/login`, sessions) — wired |
 | `TAVILY_API_KEY` | grounding / sources |
 | `MAGI_BETA_CODE` | locks `/console` (unset = open) |
 | `MAGI_DAILY_USD_CAP` / `MAGI_USER_DAILY_USD_CAP` | daily $ caps (default 25 / 2) |

@@ -285,13 +285,34 @@ button:disabled {
 }
 
 .auth-station strong {
-  max-width: 170px;
+  max-width: 190px;
   overflow: hidden;
   color: var(--text);
   font-family: var(--mono);
   font-size: 0.74rem;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.auth-link {
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent-2);
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-decoration: none;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.auth-link:hover {
+  color: var(--accent);
+  filter: none;
 }
 
 /* ---- chat column ---- */
@@ -1689,6 +1710,48 @@ button:disabled {
   color: var(--accent);
   font-family: var(--mono);
   font-size: 0.82rem;
+}
+
+.gate-notice {
+  margin: 14px 0 0;
+  color: var(--green);
+  font-family: var(--mono);
+  font-size: 0.82rem;
+}
+
+.gate-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin: 0 0 18px;
+}
+
+.gate-tabs button {
+  padding: 9px 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-2);
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.gate-tabs button.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+/* email/password inputs on the login gate — normal casing, left-aligned */
+.gate-form input.gate-email {
+  font-family: inherit;
+  letter-spacing: normal;
+  text-align: left;
+  text-transform: none;
+}
+
+.gate-form input.gate-email::placeholder {
+  letter-spacing: normal;
 }
 
 .gate-micro {
