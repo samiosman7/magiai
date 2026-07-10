@@ -55,7 +55,8 @@ export type TaskKind =
   | "analysis"
   | "data"
   | "website"
-  | "automation";
+  | "automation"
+  | "legal";
 
 export type TaskProfile = {
   kind: TaskKind;

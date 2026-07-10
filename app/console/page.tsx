@@ -97,6 +97,17 @@ type ProviderStatus = {
   keyCount: number;
 };
 
+type UploadedFile = {
+  id: string;
+  name: string;
+  kind: string;
+  chars: number;
+  truncated: boolean;
+  ok: boolean;
+  note?: string;
+  text: string;
+};
+
 type BillingSnapshot = {
   plan: string;
   planName: string;
@@ -161,8 +172,20 @@ const examplePrompts = [
   "Draft a competitive analysis of the top 3 meal-kit companies",
 ];
 
+// Keep in sync with MAX_FILES in lib/magi/attachments.ts.
+const MAX_ATTACHMENTS = 6;
+const ACCEPTED_FILES = ".pdf,.docx,.txt,.md,.csv,.tsv,.json,.log,.yaml,.yml,.xml,.html,.rtf,.png,.jpg,.jpeg,.webp,.gif";
+
 function createId() {
   return crypto.randomUUID();
+}
+
+function kindIcon(kind: string) {
+  if (kind === "pdf") return "PDF";
+  if (kind === "docx") return "DOC";
+  if (kind === "image") return "IMG";
+  if (kind === "text") return "TXT";
+  return "FILE";
 }
 
 function copyText(text: string) {
@@ -206,9 +229,12 @@ export default function Home() {
   const [isRunning, setIsRunning] = useState(false);
   const [runCost, setRunCost] = useState<RunCost | null>(null);
   const [costByMode, setCostByMode] = useState<Record<string, number>>({});
+  const [attachments, setAttachments] = useState<UploadedFile[]>([]);
+  const [uploading, setUploading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const currentPromptRef = useRef("");
   const streamingIdRef = useRef<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const hasMessages = messages.length > 0;
   // Developer panels are hidden by default; append ?dev=1 to inspect internals.
@@ -360,18 +386,69 @@ export default function Home() {
     window.localStorage.setItem("magi.workspaceRuns", JSON.stringify(workspaceRuns.slice(0, 20)));
   }, [workspaceRuns]);
 
+  async function uploadFiles(fileList: FileList | null) {
+    if (!fileList || fileList.length === 0) return;
+    const room = MAX_ATTACHMENTS - attachments.length;
+    if (room <= 0) return;
+    const chosen = Array.from(fileList).slice(0, room);
+
+    setUploading(true);
+    try {
+      const form = new FormData();
+      chosen.forEach((file) => form.append("files", file));
+      const response = await fetch("/api/files/extract", {
+        method: "POST",
+        headers: { "x-magi-user-id": operatorId },
+        body: form,
+      });
+      const data = (await response.json().catch(() => null)) as { attachments?: UploadedFile[]; error?: string } | null;
+      if (!response.ok || !data?.attachments) {
+        setMessages((current) => [
+          ...current,
+          { id: createId(), kind: "status", text: data?.error || "Couldn't read those files. Try a PDF, DOCX, image, or text file." },
+        ]);
+        return;
+      }
+      setAttachments((current) => [...current, ...data.attachments!].slice(0, MAX_ATTACHMENTS));
+    } catch {
+      setMessages((current) => [
+        ...current,
+        { id: createId(), kind: "status", text: "File upload failed. Check your connection and try again." },
+      ]);
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  function removeAttachment(id: string) {
+    setAttachments((current) => current.filter((a) => a.id !== id));
+  }
+
   async function submitPrompt(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const trimmed = prompt.trim();
-    if (!trimmed || isRunning) return;
+    const readyFiles = attachments.filter((a) => a.ok);
+    // A run needs either a prompt or at least one readable file.
+    if ((!trimmed && readyFiles.length === 0) || isRunning || uploading) return;
 
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
     setIsRunning(true);
     setPrompt("");
-    currentPromptRef.current = trimmed;
-    setMessages((current) => [...current, { id: createId(), kind: "user", text: trimmed }]);
+    const sentAttachments = attachments;
+    setAttachments([]);
+    const fileNote =
+      readyFiles.length > 0
+        ? `${readyFiles.length === 1 ? "1 file" : `${readyFiles.length} files`} attached: ${readyFiles.map((a) => a.name).join(", ")}`
+        : "";
+    const userText = trimmed || "Review the attached file(s) and summarize what matters.";
+    currentPromptRef.current = userText;
+    setMessages((current) => [
+      ...current,
+      { id: createId(), kind: "user", text: fileNote ? `${userText}\n\n📎 ${fileNote}` : userText },
+    ]);
     setSteps(initialSteps);
     setNodeOutputs([]);
     setSkillOutputs([]);
@@ -392,6 +469,18 @@ export default function Home() {
             .filter((m) => m.kind === "user" || m.kind === "magi")
             .slice(-8)
             .map((m) => ({ role: m.kind === "user" ? "user" : "assistant", text: m.text })),
+          attachments: sentAttachments
+            .filter((a) => a.ok)
+            .map((a) => ({
+              id: a.id,
+              name: a.name,
+              kind: a.kind,
+              chars: a.chars,
+              truncated: a.truncated,
+              ok: a.ok,
+              note: a.note,
+              text: a.text,
+            })),
         }),
         signal: controller.signal,
       });
@@ -583,6 +672,7 @@ export default function Home() {
     setTaskProfile(null);
     setArtifacts([]);
     setRunCost(null);
+    setAttachments([]);
     streamingIdRef.current = null;
     setIsRunning(false);
   }
@@ -848,14 +938,57 @@ export default function Home() {
               </button>
             ))}
           </div>
+          {(attachments.length > 0 || uploading) && (
+            <div className="attach-tray" aria-label="Attached files">
+              {attachments.map((file) => (
+                <span className={`attach-chip ${file.ok ? "" : "bad"}`} key={file.id}>
+                  <span className="attach-kind">{kindIcon(file.kind)}</span>
+                  <span className="attach-name" title={file.note || file.name}>
+                    {file.name}
+                  </span>
+                  <span className="attach-meta">
+                    {file.ok ? `${(file.chars / 1000).toFixed(1)}k chars${file.truncated ? " · trimmed" : ""}` : "unreadable"}
+                  </span>
+                  <button
+                    type="button"
+                    className="attach-remove"
+                    aria-label={`Remove ${file.name}`}
+                    onClick={() => removeAttachment(file.id)}
+                    disabled={isRunning}
+                  >
+                    ✕
+                  </button>
+                </span>
+              ))}
+              {uploading && <span className="attach-chip loading">Reading files…</span>}
+            </div>
+          )}
           <div className="composer-input">
             <label className="sr-only" htmlFor="promptInput">
               Prompt
             </label>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept={ACCEPTED_FILES}
+              className="sr-only"
+              onChange={(event) => uploadFiles(event.target.files)}
+            />
+            <button
+              type="button"
+              className="attach-button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isRunning || uploading || attachments.length >= MAX_ATTACHMENTS}
+              title="Attach files — PDF, DOCX, images, or text. Legal docs get a clause-by-clause review."
+              aria-label="Attach files"
+            >
+              📎
+            </button>
             <textarea
               id="promptInput"
               rows={2}
-              placeholder="Ask MAGI anything — a plan, a memo, an analysis, code…"
+              placeholder="Ask MAGI anything, or attach a file (contract, PDF, spreadsheet…) and ask about it"
               value={prompt}
               onChange={(event) => setPrompt(event.target.value)}
               disabled={isRunning}
@@ -865,7 +998,7 @@ export default function Home() {
                 Stop
               </button>
             ) : (
-              <button type="submit">Decide</button>
+              <button type="submit" disabled={uploading}>Decide</button>
             )}
           </div>
         </form>

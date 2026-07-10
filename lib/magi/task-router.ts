@@ -12,6 +12,16 @@ type TaskRule = {
 
 const taskRules: TaskRule[] = [
   {
+    kind: "legal",
+    label: "Legal document review",
+    pattern: /\b(contract|agreement|lease|nda|clause|legal|liabilit|indemnif|tenant|landlord|settlement|waiver|terms of service|privacy policy|obligation|non-disclosure)\b/,
+    artifactType: "report",
+    skills: ["melchior-diagnostics", "fact-judge-auditor", "casper-guardian"],
+    judge:
+      "Clause coverage, accuracy of obligations/dates/liabilities, unusual or risky terms flagged, nothing invented beyond the document, and a not-legal-advice disclaimer present.",
+    toolHints: ["clause extraction", "obligation map", "risk flags", "plain-English summary"],
+  },
+  {
     kind: "website",
     label: "Website or UI build",
     pattern: /\b(website|site|landing page|homepage|web page|ui|component|portfolio)\b/,
@@ -76,9 +86,15 @@ const taskRules: TaskRule[] = [
   },
 ];
 
-export function classifyTask(prompt: string): TaskProfile {
+export function classifyTask(prompt: string, options?: { forceLegal?: boolean }): TaskProfile {
   const lower = prompt.toLowerCase();
-  const matches = taskRules.filter((rule) => rule.pattern.test(lower));
+  let matches = taskRules.filter((rule) => rule.pattern.test(lower));
+  // Attachments can look legal even when the prompt is terse ("review this"):
+  // pull the legal rule to the front so the run routes and rubrics as legal.
+  if (options?.forceLegal) {
+    const legalRule = taskRules.find((rule) => rule.kind === "legal");
+    if (legalRule) matches = [legalRule, ...matches.filter((rule) => rule.kind !== "legal")];
+  }
   const primary = matches[0] ?? {
     kind: "general" as const,
     label: "General assistant task",

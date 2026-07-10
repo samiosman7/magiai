@@ -104,6 +104,10 @@ const FAQ = [
     a: "A single model answers once, from memory, with no one checking it. MAGI grounds the answer in live sources, then a dedicated adversary node attacks every claim against those sources before the final verdict is forged. You see citations, not vibes.",
   },
   {
+    q: "Can I upload documents — contracts, PDFs, reports?",
+    a: "Yes. Attach PDFs, Word docs, spreadsheets, text files, or even photos of documents, and MAGI reads them (scanned images are OCR'd) before answering. Upload a contract and it runs a clause-by-clause legal review — parties, obligations, deadlines, liability, and risky or missing terms — quoting the document and flagging what matters. It's informational, not legal advice.",
+  },
+  {
     q: "What does it cost?",
     a: "Free gets you 10 credits a month. Pro is $15/mo for 200 credits and premium frontier routing; Studio is $40/mo for 600. A Standard run costs 1 credit, Premium 3 — and every run shows its exact model cost. During the invited beta, runs are free.",
   },

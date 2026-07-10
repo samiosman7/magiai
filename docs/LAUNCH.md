@@ -96,6 +96,24 @@ confirm a capped/blocked run shows the clean capacity message.
 - **Tests**: `npm test` (vitest). Covers text-utils + spend-cap logic. Add tests with new logic.
 - **Logs**: `/api/magi` emits structured `magi.start` / `magi.done` / `magi.error` lines (request id, mode, cost, latency) — greppable in Vercel logs.
 
+## File uploads & document/legal analysis (added — Fable 5 session)
+- **Upload** any of: PDF, DOCX, TXT/MD/CSV/JSON/etc., and images (PNG/JPG/WEBP).
+  Attach via the 📎 button in the console composer (up to 6 files, 15 MB each).
+- **Extraction** (`lib/magi/attachments.ts` + `/api/files/extract`): text files decode
+  directly, DOCX is unzipped, PDF uses `unpdf` (serverless-safe, no native deps), and
+  images/scanned docs are OCR'd via the AI gateway vision model
+  (`MAGI_VISION_MODEL`, default `openai/gpt-4o-mini`).
+- **Pipeline**: extracted text is injected into **every** node's prompt (survives the
+  whole chain, unlike chat history which only the Architect sees). A run with only a
+  file and no prompt defaults to "summarize what matters."
+- **Legal mode**: when the prompt or a document looks legal (contract/NDA/lease/etc.),
+  the run routes as `legal` and every node gets a clause-review directive — parties,
+  obligations, dates, liability, termination, governing law, risky/missing terms — plus
+  a mandatory "not legal advice" disclaimer. `looksLegal` in attachments.ts.
+- **Limits**: per-file 24k chars into the model; `MAGI_FILE_RATE_LIMIT` (default 40/hr).
+- Extraction is client-agnostic: the console holds the parsed text and sends it back
+  with the run; `/api/magi` re-validates and re-caps it server-side.
+
 ## Full env-var reference
 | Var | Purpose |
 | --- | --- |
@@ -110,3 +128,5 @@ confirm a capped/blocked run shows the clean capacity message.
 | `MAGI_STREAM_IDLE_MS` | stalled-stream abort (default 30000) |
 | `MAGI_REQUIRE_BILLING` + `STRIPE_*` | activate subscriptions (code ready) |
 | `MAGI_FREE_CREDITS` | override free plan's monthly credits (default 10) |
+| `MAGI_FILE_RATE_LIMIT` | file uploads per user per hour (default 40) |
+| `MAGI_VISION_MODEL` | gateway model for image/scanned-doc OCR (default `openai/gpt-4o-mini`) |

@@ -3,6 +3,8 @@ import { checkSpendLimits, recordSpend } from "@/lib/billing/spend";
 import { accountRequired, getRequestUser } from "@/lib/auth/user";
 import { runMagiPipeline } from "@/lib/magi/pipeline";
 import type { GeminiModel, MagiEvent, MagiMode } from "@/lib/magi/types";
+import type { Attachment, AttachmentKind } from "@/lib/magi/attachments";
+import { MAX_FILES, PER_FILE_CHAR_CAP } from "@/lib/magi/attachments";
 import { checkRateLimit, rateLimitResponse } from "@/lib/security/rate-limit";
 
 export const runtime = "nodejs";
@@ -48,6 +50,7 @@ export async function POST(request: Request) {
     mode?: unknown;
     geminiModel?: unknown;
     history?: unknown;
+    attachments?: unknown;
   } | null;
 
   const history = Array.isArray(body?.history)
@@ -60,11 +63,39 @@ export async function POST(request: Request) {
         .map((h) => ({ role: h.role === "user" ? "user" : "assistant", text: h.text.slice(0, 2000) }))
     : undefined;
 
-  const prompt = typeof body?.prompt === "string" ? body.prompt.trim() : "";
+  // Attachments come back from /api/files/extract already parsed; the client
+  // returns them with the run. Re-validate and re-cap here — never trust sizes
+  // from the client — before they reach the model prompt.
+  const validKinds = new Set<AttachmentKind>(["text", "pdf", "docx", "image", "unknown"]);
+  const attachments: Attachment[] = Array.isArray(body?.attachments)
+    ? (body.attachments as unknown[])
+        .filter((a): a is Record<string, unknown> => !!a && typeof a === "object")
+        .slice(0, MAX_FILES)
+        .map((a, i) => {
+          const text = typeof a.text === "string" ? a.text.slice(0, PER_FILE_CHAR_CAP) : "";
+          const kind = validKinds.has(a.kind as AttachmentKind) ? (a.kind as AttachmentKind) : "unknown";
+          return {
+            id: typeof a.id === "string" ? a.id : `att-${i}`,
+            name: typeof a.name === "string" ? a.name.slice(0, 200) : `file-${i + 1}`,
+            kind,
+            chars: text.length,
+            truncated: Boolean(a.truncated),
+            ok: text.length > 0 && a.ok !== false,
+            text,
+            note: typeof a.note === "string" ? a.note.slice(0, 200) : undefined,
+          };
+        })
+    : [];
+
+  const rawPrompt = typeof body?.prompt === "string" ? body.prompt.trim() : "";
   const mode = validModes.has(String(body?.mode)) ? (body?.mode as MagiMode) : "standard";
   const geminiModel = validGeminiModels.has(String(body?.geminiModel))
     ? (body?.geminiModel as GeminiModel)
     : undefined;
+
+  // A file with no typed prompt is a valid request ("just read this"): default it.
+  const prompt =
+    rawPrompt || (attachments.some((a) => a.ok) ? "Review the attached file(s) and give me a clear, useful summary of what they contain and anything important I should know." : "");
 
   if (!prompt) {
     return Response.json({ error: "Prompt is required." }, { status: 400 });
@@ -134,7 +165,7 @@ export async function POST(request: Request) {
           name: "Credit gate",
           text: `${creditCheck.creditsRequired} credits authorized for ${mode} mode.`,
         });
-        await runMagiPipeline(prompt, mode, emit, geminiModel, request.signal, history);
+        await runMagiPipeline(prompt, mode, emit, geminiModel, request.signal, history, attachments);
         succeeded = true;
       } catch (error) {
         // Graceful failure: clean user-facing message, and don't charge for a broken run.

@@ -5,6 +5,7 @@ import { skillLabels, skillPackPaths, skillPrompt } from "./skills";
 import { classifyTask, createPlannedArtifact } from "./task-router";
 import { webSearch, buildGrounding } from "./search";
 import { parseTriage, cleanFinalAnswer, stripDanglingCitations } from "./text-utils";
+import { buildAttachmentBlock, looksLegal, attachmentSummary, type Attachment } from "./attachments";
 import type { GeminiModel, MagiEvent, MagiMode, PipelineStep } from "./types";
 
 type Emit = (event: MagiEvent) => void;
@@ -18,9 +19,12 @@ export async function runMagiPipeline(
   emit: Emit,
   geminiModel?: GeminiModel,
   signal?: AbortSignal,
-  history?: Array<{ role: string; text: string }>
+  history?: Array<{ role: string; text: string }>,
+  attachments: Attachment[] = []
 ) {
-  const taskProfile = classifyTask(prompt);
+  const hasFiles = attachments.some((a) => a.ok && a.text);
+  const isLegal = looksLegal(attachments, prompt);
+  const taskProfile = classifyTask(prompt, { forceLegal: isLegal });
 
   const historyBlock =
     history && history.length
@@ -30,7 +34,8 @@ export async function runMagiPipeline(
       : "";
 
   // Instant, free shortcuts (greetings, plain arithmetic) — no model call at all.
-  const quick = quickAnswer(prompt);
+  // Skipped when files are attached: an uploaded doc always deserves a real read.
+  const quick = hasFiles ? null : quickAnswer(prompt);
   if (quick !== null) {
     emit({ type: "final", answer: `The Magi has decided.\n\n${quick}` });
     return;
@@ -40,6 +45,20 @@ export async function runMagiPipeline(
   const runtimeContext = await buildMagiRuntimeContext(prompt);
   emit({ type: "task", profile: taskProfile });
   emit({ type: "artifact", artifact: createPlannedArtifact(taskProfile, prompt) });
+
+  // Uploaded files: injected into every node so their content survives the whole
+  // chain (unlike history, which only the Architect sees). Legal docs get an
+  // extra clause-review directive + a mandatory not-legal-advice disclaimer.
+  const attachmentBlock = buildAttachmentBlock(attachments);
+  if (attachments.length) {
+    emit({ type: "status", step: "scan", message: `MAGI is reading files — ${attachmentSummary(attachments)}` });
+    emit({ type: "node", name: "Attachments", text: attachmentSummary(attachments) });
+  }
+  const legalDirective = isLegal
+    ? "\n\nLEGAL DOCUMENT MODE: Work only from the attached/quoted document text. Identify the parties, key obligations, payment/terms, important dates and deadlines, liability and indemnity, termination and renewal, confidentiality/IP, and governing law. Flag unusual, one-sided, ambiguous, or risky clauses and anything a reasonable party would expect but is missing. Quote exact clause language when it matters. Do not invent terms that are not present. Always end with: \"This is general information, not legal advice.\""
+    : "";
+  const fileContext = `${attachmentBlock ? `\n\n${attachmentBlock}` : ""}${legalDirective}`;
+
   complete("scan", emit);
   complete("route", emit);
 
@@ -70,7 +89,7 @@ export async function runMagiPipeline(
   emit({ type: "status", step: "melchior", message: "MAGI is working..." });
   const opener = await generateText({
     ...getModelPlan(mode, "melchior", geminiModel),
-    system: `${productContext}\n\n${route}\n\nYou are Melchior, the Architect — MAGI's first gate. You decide the request type and, for real work, design the blueprint the builder will follow. You do NOT write the final deliverable yourself.\nClassify, then act:\n- SIMPLE — a direct factual or conversational reply fully answers it. Answer it directly; do not pad it into a report.\n- COMPLEX — it needs a structured, multi-part deliverable. Output a PLAN, not prose: the exact sections/components it must contain, the must-have requirements (including ones the user implied but did not state), the approach to take, and the key facts or constraints to respect. Be complete — anything you leave out, the builder will not include.\n- REFUSE — clearly harmful or illegal (malware, weapons, exploitation of minors, credible violence, self-harm facilitation, fraud). Refuse in one sentence.\nBegin with exactly one tag on its own first line: [SIMPLE], [COMPLEX], or [REFUSE]. After the tag: the answer (SIMPLE), the plan (COMPLEX), or the one-sentence refusal (REFUSE).\n\n${skillPrompt("melchior")}\n\n${mcp}\n\nOutput clean Markdown. ${noWrap}\n\n${grounding}`,
+    system: `${productContext}\n\n${route}\n\nYou are Melchior, the Architect — MAGI's first gate. You decide the request type and, for real work, design the blueprint the builder will follow. You do NOT write the final deliverable yourself.\nClassify, then act:\n- SIMPLE — a direct factual or conversational reply fully answers it. Answer it directly; do not pad it into a report.\n- COMPLEX — it needs a structured, multi-part deliverable. Output a PLAN, not prose: the exact sections/components it must contain, the must-have requirements (including ones the user implied but did not state), the approach to take, and the key facts or constraints to respect. Be complete — anything you leave out, the builder will not include.\n- REFUSE — clearly harmful or illegal (malware, weapons, exploitation of minors, credible violence, self-harm facilitation, fraud). Refuse in one sentence.\nWhen files are attached and the user asks you to review, analyze, summarize, extract from, or compare them, treat it as COMPLEX and have the plan cover the document thoroughly.\nBegin with exactly one tag on its own first line: [SIMPLE], [COMPLEX], or [REFUSE]. After the tag: the answer (SIMPLE), the plan (COMPLEX), or the one-sentence refusal (REFUSE).\n\n${skillPrompt("melchior")}\n\n${mcp}\n\nOutput clean Markdown. ${noWrap}\n\n${grounding}${fileContext}`,
     prompt: historyBlock ? `${historyBlock}Current request:\n${prompt}` : prompt,
     maxTokens: 900,
     signal,
@@ -106,7 +125,7 @@ export async function runMagiPipeline(
   try {
     const maverick = await generateText({
       ...getModelPlan(mode, "balthasar", geminiModel),
-      system: `${productContext}\n\n${route}\n\nYou are Balthasar, the Maverick — the builder. You receive the Architect's plan and write the actual deliverable from it: cover every section and requirement in the plan, in full, concrete prose (or code/tables as fitting). As you build, add what a conventional execution would miss — a sharper framing, a non-obvious insight, or a real differentiator — at least one, and only where it genuinely strengthens the work, never as decoration. Follow the plan's structure; do not drop its requirements.\n\n${skillPrompt("balthasar")}\n\n${mcp}\n\nReturn the COMPLETE deliverable in Markdown. ${noWrap}\n\n${grounding}`,
+      system: `${productContext}\n\n${route}\n\nYou are Balthasar, the Maverick — the builder. You receive the Architect's plan and write the actual deliverable from it: cover every section and requirement in the plan, in full, concrete prose (or code/tables as fitting). As you build, add what a conventional execution would miss — a sharper framing, a non-obvious insight, or a real differentiator — at least one, and only where it genuinely strengthens the work, never as decoration. Follow the plan's structure; do not drop its requirements.\n\n${skillPrompt("balthasar")}\n\n${mcp}\n\nReturn the COMPLETE deliverable in Markdown. ${noWrap}\n\n${grounding}${fileContext}`,
       prompt: `Original request:\n${prompt}\n\nArchitect's plan to build from:\n${architectText}`,
       maxTokens: 1900,
       signal,
@@ -128,7 +147,7 @@ export async function runMagiPipeline(
   try {
     const adversary = await generateText({
       ...getModelPlan(mode, "casper", geminiModel),
-      system: `${productContext}\n\n${route}\n\nYou are Casper, the Adversary — a ruthless devil's advocate. You do NOT rewrite the deliverable. Read it as a skeptical customer, tough investor, and tired operator would, and output a sharp CRITIQUE: a numbered list of its real weaknesses — what is fragile, naive, unsupported, missing, or over-promised — and any claim the sources below do not support. Be specific; point to where each problem is. List only genuine problems; if something is solid, do not invent a complaint.\n\n${skillPrompt("casper")}\n\n${mcp}\n\nOutput ONLY the numbered critique — no rewritten deliverable, no preamble. ${noWrap}\n\n${grounding}`,
+      system: `${productContext}\n\n${route}\n\nYou are Casper, the Adversary — a ruthless devil's advocate. You do NOT rewrite the deliverable. Read it as a skeptical customer, tough investor, and tired operator would, and output a sharp CRITIQUE: a numbered list of its real weaknesses — what is fragile, naive, unsupported, missing, or over-promised — and any claim the sources below do not support. Be specific; point to where each problem is. List only genuine problems; if something is solid, do not invent a complaint.\n\n${skillPrompt("casper")}\n\n${mcp}\n\nOutput ONLY the numbered critique — no rewritten deliverable, no preamble. ${noWrap}\n\n${grounding}${fileContext}`,
       prompt: `Original request:\n${prompt}\n\nDeliverable to critique:\n${maverickText}`,
       maxTokens: 800,
       signal,
@@ -151,7 +170,7 @@ export async function runMagiPipeline(
     const synthesis = await generateTextStream(
       {
         ...getModelPlan(mode, "judge", geminiModel),
-        system: `${productContext}\n\n${route}\n\nYou are the Synthesis — the final voice the user sees. You receive the builder's deliverable and the Adversary's critique. Produce the finished deliverable: keep everything strong in the build, and FIX every valid point in the critique — correct or remove unsupported claims, fill the gaps, answer the objections. Ignore critique points that are wrong or pedantic. Read as one confident author.\n\n${skillPrompt("judge")}\n\nReturn ONLY the single finished deliverable in Markdown — not a list of changes, not the critique. ${noWrap} If sources are provided below, keep inline [n] citations for sourced claims.\n\n${grounding}`,
+        system: `${productContext}\n\n${route}\n\nYou are the Synthesis — the final voice the user sees. You receive the builder's deliverable and the Adversary's critique. Produce the finished deliverable: keep everything strong in the build, and FIX every valid point in the critique — correct or remove unsupported claims, fill the gaps, answer the objections. Ignore critique points that are wrong or pedantic. Read as one confident author.\n\n${skillPrompt("judge")}\n\nReturn ONLY the single finished deliverable in Markdown — not a list of changes, not the critique. ${noWrap} If sources are provided below, keep inline [n] citations for sourced claims.\n\n${grounding}${fileContext}`,
         prompt: `Original request:\n${prompt}\n\nDeliverable:\n${maverickText}\n\nAdversary critique to resolve (fix valid points, ignore wrong ones):\n${adversaryText || "(no critique returned — finalize the deliverable as-is)"}`,
         maxTokens: 2200,
         signal,
