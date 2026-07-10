@@ -1,6 +1,15 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ClipboardEvent as ReactClipboardEvent,
+  type DragEvent as ReactDragEvent,
+  type FormEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
@@ -231,6 +240,7 @@ export default function Home() {
   const [costByMode, setCostByMode] = useState<Record<string, number>>({});
   const [attachments, setAttachments] = useState<UploadedFile[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const currentPromptRef = useRef("");
   const streamingIdRef = useRef<string | null>(null);
@@ -423,6 +433,30 @@ export default function Home() {
 
   function removeAttachment(id: string) {
     setAttachments((current) => current.filter((a) => a.id !== id));
+  }
+
+  // Enter sends; Shift+Enter makes a newline. Matches every modern chat UI.
+  function handlePromptKeyDown(event: ReactKeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+      event.preventDefault();
+      if (!isRunning && !uploading) event.currentTarget.form?.requestSubmit();
+    }
+  }
+
+  // Paste a screenshot or copied image straight into the composer to scan it.
+  function handlePromptPaste(event: ReactClipboardEvent<HTMLTextAreaElement>) {
+    const files = Array.from(event.clipboardData.files).filter((f) => f.type.startsWith("image/"));
+    if (files.length === 0) return;
+    event.preventDefault();
+    const dt = new DataTransfer();
+    files.forEach((f) => dt.items.add(f));
+    uploadFiles(dt.files);
+  }
+
+  function handleDrop(event: ReactDragEvent) {
+    event.preventDefault();
+    setDragActive(false);
+    if (event.dataTransfer.files?.length) uploadFiles(event.dataTransfer.files);
   }
 
   async function submitPrompt(event: FormEvent<HTMLFormElement>) {
@@ -918,7 +952,25 @@ export default function Home() {
           </div>
         </section>
 
-        <form className="composer" onSubmit={submitPrompt}>
+        <form
+          className={`composer ${dragActive ? "drag-active" : ""}`}
+          onSubmit={submitPrompt}
+          onDragOver={(e) => {
+            if (e.dataTransfer.types.includes("Files")) {
+              e.preventDefault();
+              setDragActive(true);
+            }
+          }}
+          onDragLeave={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragActive(false);
+          }}
+          onDrop={handleDrop}
+        >
+          {dragActive && (
+            <div className="drag-overlay" aria-hidden="true">
+              Drop files to attach — PDF, DOCX, images, or text
+            </div>
+          )}
           <div className="mode-cards" role="radiogroup" aria-label="MAGI tier">
             {(Object.keys(modeInfo) as ModeKey[]).map((key) => (
               <button
@@ -988,9 +1040,11 @@ export default function Home() {
             <textarea
               id="promptInput"
               rows={2}
-              placeholder="Ask MAGI anything, or attach a file (contract, PDF, spreadsheet…) and ask about it"
+              placeholder="Ask MAGI anything, or attach a file (contract, PDF, spreadsheet…) and ask about it. Enter to send, Shift+Enter for a new line."
               value={prompt}
               onChange={(event) => setPrompt(event.target.value)}
+              onKeyDown={handlePromptKeyDown}
+              onPaste={handlePromptPaste}
               disabled={isRunning}
             />
             {isRunning ? (
