@@ -96,6 +96,18 @@ confirm a capped/blocked run shows the clean capacity message.
 - **Tests**: `npm test` (vitest). Covers text-utils + spend-cap logic. Add tests with new logic.
 - **Logs**: `/api/magi` emits structured `magi.start` / `magi.done` / `magi.error` lines (request id, mode, cost, latency) — greppable in Vercel logs.
 
+## Rate limiting (added — Fable 5 session)
+- **Public endpoints** are IP-limited: `/api/access` (beta-code brute-force guard,
+  10 / IP / 10 min) and `/api/waitlist` (spam guard, 8 / IP / hour). Authenticated
+  endpoints (`/api/magi`, file/artifact downloads) keep their per-user hourly limits.
+- **Two layers** (`lib/security/rate-limit.ts`): an in-memory burst floor (instant,
+  per-instance) plus a **durable Supabase-backed** fixed-window counter so limits hold
+  across serverless instances — essential for brute-force protection. The durable layer
+  **fails open** if its table is missing, so nothing breaks before you create it.
+- **ACTION**: the durable layer needs the new `magi_rate_limits` table. Re-run
+  `supabase/schema.sql` (idempotent — safe to run again; it only adds the missing table).
+  Until then the in-memory floor still protects within each instance.
+
 ## File uploads & document/legal analysis (added — Fable 5 session)
 - **Upload** any of: PDF, DOCX, TXT/MD/CSV/JSON/etc., and images (PNG/JPG/WEBP).
   Attach via the 📎 button in the console composer (up to 6 files, 15 MB each).

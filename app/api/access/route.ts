@@ -1,6 +1,12 @@
+import { guardByIp } from "@/lib/security/rate-limit";
+
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  // Brute-force guard on the beta gate: 10 attempts per IP per 10 minutes.
+  const blocked = await guardByIp(request, "access", { limit: 10, windowMs: 10 * 60 * 1000 });
+  if (blocked) return blocked;
+
   const body = (await request.json().catch(() => null)) as { code?: unknown } | null;
   const code = typeof body?.code === "string" ? body.code.trim() : "";
   const expected = process.env.MAGI_BETA_CODE;

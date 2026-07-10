@@ -1,8 +1,15 @@
 import { getSupabaseAdmin, hasSupabaseConfig } from "@/lib/supabase/server";
+import { guardByIp } from "@/lib/security/rate-limit";
+
+export const runtime = "nodejs";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function POST(request: Request) {
+  // Anti-spam: 8 signups per IP per hour.
+  const blocked = await guardByIp(request, "waitlist", { limit: 8, windowMs: 60 * 60 * 1000 });
+  if (blocked) return blocked;
+
   const body = (await request.json().catch(() => null)) as { email?: unknown; source?: unknown } | null;
   const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
   const source = typeof body?.source === "string" ? body.source.slice(0, 80) : "landing";

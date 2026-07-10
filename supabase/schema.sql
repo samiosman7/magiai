@@ -102,3 +102,17 @@ create table if not exists public.magi_spend (
 alter table public.magi_spend enable row level security;
 
 create index if not exists magi_spend_day_idx on public.magi_spend(day);
+
+-- Durable fixed-window rate limiting for public endpoints (access code, waitlist),
+-- so limits survive serverless instance churn. Written via the service role only;
+-- fixed windows keyed by (bucket, window_start-epoch-ms). Fails open if absent.
+create table if not exists public.magi_rate_limits (
+  bucket text not null,
+  window_start bigint not null,
+  count integer not null default 0,
+  primary key (bucket, window_start)
+);
+
+alter table public.magi_rate_limits enable row level security;
+
+create index if not exists magi_rate_limits_window_idx on public.magi_rate_limits(window_start);
