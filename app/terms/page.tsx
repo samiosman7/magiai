@@ -16,7 +16,7 @@ export default function Terms() {
 
       <article className="legal-body">
         <h1>Terms of Service</h1>
-        <p className="legal-updated">Last updated: June 2026</p>
+        <p className="legal-updated">Last updated: July 2026</p>
 
         <p className="legal-note">
           This is a starting template, not legal advice. Have a lawyer review it before relying on it.
@@ -36,30 +36,51 @@ export default function Terms() {
           financial, medical, or other) advice.
         </p>
 
-        <h2>3. Acceptable use</h2>
+        <h2>3. Not legal, financial, or professional advice</h2>
+        <p>
+          MAGI can summarize, review, and analyze documents &mdash; including contracts and other legal
+          materials &mdash; and can discuss legal, financial, medical, and other regulated topics. All of
+          this is <strong>general information only</strong>. It is not legal, financial, tax, medical, or
+          other professional advice, it does not create an attorney&ndash;client or any other professional
+          relationship, and it may be incomplete or wrong for your situation. Laws and circumstances vary.
+          Consult a qualified professional before making decisions, signing anything, or acting on any output.
+        </p>
+
+        <h2>4. Files you upload</h2>
+        <p>
+          You may upload files (documents, PDFs, images, and similar) for MAGI to analyze. By uploading, you
+          confirm you have the right to share that content and to have it processed by AI. We extract text
+          from your files and send it to the underlying model providers solely to fulfill your request. Do
+          not upload content you are not permitted to share, and avoid uploading sensitive personal
+          information you don&rsquo;t need analyzed. You are responsible for the content you upload and for
+          verifying any analysis before relying on it.
+        </p>
+
+        <h2>5. Acceptable use</h2>
         <p>
           Don&rsquo;t use MAGI to generate unlawful, harmful, infringing, or abusive content, to attempt
           to overload or reverse-engineer the service, or to violate the terms of the underlying model
           providers. We may suspend access for misuse.
         </p>
 
-        <h2>4. Accounts &amp; billing</h2>
+        <h2>6. Accounts &amp; billing</h2>
         <p>
           Paid plans, when available, are billed as described at checkout. Usage may be subject to fair-use
           and capacity limits. Fees are non-refundable except where required by law.
         </p>
 
-        <h2>5. No warranty &amp; limitation of liability</h2>
+        <h2>7. No warranty &amp; limitation of liability</h2>
         <p>
           MAGI is provided &ldquo;as is,&rdquo; without warranties of any kind. To the maximum extent
           permitted by law, we are not liable for any indirect, incidental, or consequential damages, or for
-          decisions made based on MAGI&rsquo;s output.
+          decisions made based on MAGI&rsquo;s output &mdash; including any reliance on document analysis or
+          legal, financial, or other information it produces.
         </p>
 
-        <h2>6. Changes</h2>
+        <h2>8. Changes</h2>
         <p>We may update these terms; continued use after changes means you accept them.</p>
 
-        <h2>7. Contact</h2>
+        <h2>9. Contact</h2>
         <p>Questions: samisosman52@gmail.com</p>
 
         <p className="legal-back"><Link href="/">← Back to MAGI</Link></p>

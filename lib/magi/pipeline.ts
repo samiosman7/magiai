@@ -171,7 +171,10 @@ export async function runMagiPipeline(
       {
         ...getModelPlan(mode, "judge", geminiModel),
         system: `${productContext}\n\n${route}\n\nYou are the Synthesis — the final voice the user sees. You receive the builder's deliverable and the Adversary's critique. Produce the finished deliverable: keep everything strong in the build, and FIX every valid point in the critique — correct or remove unsupported claims, fill the gaps, answer the objections. Ignore critique points that are wrong or pedantic. Read as one confident author.\n\n${skillPrompt("judge")}\n\nReturn ONLY the single finished deliverable in Markdown — not a list of changes, not the critique. ${noWrap} If sources are provided below, keep inline [n] citations for sourced claims.\n\n${grounding}${fileContext}`,
-        prompt: `Original request:\n${prompt}\n\nDeliverable:\n${maverickText}\n\nAdversary critique to resolve (fix valid points, ignore wrong ones):\n${adversaryText || "(no critique returned — finalize the deliverable as-is)"}`,
+        // Synthesis is the final voice, so it (not just the Architect) gets the
+        // conversation history — follow-ups like "make it shorter" or "now as an
+        // email" keep their context all the way to the answer the user sees.
+        prompt: `${historyBlock}Original request:\n${prompt}\n\nDeliverable:\n${maverickText}\n\nAdversary critique to resolve (fix valid points, ignore wrong ones):\n${adversaryText || "(no critique returned — finalize the deliverable as-is)"}`,
         maxTokens: 2200,
         signal,
       },
