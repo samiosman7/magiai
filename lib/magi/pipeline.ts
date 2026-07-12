@@ -13,18 +13,56 @@ type Emit = (event: MagiEvent) => void;
 const productContext =
   'You are one stage of MAGI, an AI system that turns a request into a verified, well-sourced deliverable. If a request refers to "MAGI," treat it as this product unless the user clearly means something else.';
 
+export type PipelineOptions = {
+  geminiModel?: GeminiModel;
+  signal?: AbortSignal;
+  history?: Array<{ role: string; text: string }>;
+  attachments?: Attachment[];
+  // What MAGI remembers about this operator + their standing instructions
+  // (lib/magi/memory.ts). Injected so every run starts knowing who it's for.
+  operatorContext?: string;
+};
+
+// A follow-up that edits the previous deliverable ("make it shorter", "as an
+// email") shouldn't re-run the whole 4-node chain — iteration must feel alive,
+// not like a fresh 40-second committee. Exported for tests.
+export function isRevisionRequest(prompt: string, lastAnswer: string | null | undefined): boolean {
+  if (!lastAnswer || lastAnswer.length < 200) return false;
+  const p = prompt.trim();
+  if (p.length === 0 || p.length > 240) return false;
+  return /\b(shorten|shorter|longer|expand|condense|tighten|simplify|rewrite|rephrase|reword|redo|revise|edit|polish|translate|tone|formal|casual|friendlier|punchier|make (it|this|that)|turn (it|this|that) into|change (the|it|this)|add (a|an|the|more)|remove (the|a|an)|cut (it|the)|instead|without the|in bullet|as an? (email|tweet|memo|post|summary|list|table))\b/i.test(
+    p
+  );
+}
+
+// Casper's numbered critique → discrete objection strings for the verification
+// panel. Exported for tests.
+export function parseObjections(critique: string): string[] {
+  return critique
+    .split(/\n(?=\s*\d+[.)]\s)/)
+    .map((s) => s.trim())
+    .filter((s) => /^\d+[.)]\s/.test(s))
+    .map((s) =>
+      s
+        .replace(/^\d+[.)]\s*/, "")
+        .replace(/\s+/g, " ")
+        .slice(0, 220)
+    )
+    .slice(0, 8);
+}
+
 export async function runMagiPipeline(
   prompt: string,
   mode: MagiMode,
   emit: Emit,
-  geminiModel?: GeminiModel,
-  signal?: AbortSignal,
-  history?: Array<{ role: string; text: string }>,
-  attachments: Attachment[] = []
+  options: PipelineOptions = {}
 ) {
+  const { geminiModel, signal, history } = options;
+  const attachments = options.attachments ?? [];
   const hasFiles = attachments.some((a) => a.ok && a.text);
   const isLegal = looksLegal(attachments, prompt);
   const taskProfile = classifyTask(prompt, { forceLegal: isLegal });
+  const operator = options.operatorContext ? `\n\n${options.operatorContext}` : "";
 
   const historyBlock =
     history && history.length
@@ -38,6 +76,15 @@ export async function runMagiPipeline(
   const quick = hasFiles ? null : quickAnswer(prompt);
   if (quick !== null) {
     emit({ type: "final", answer: `The Magi has decided.\n\n${quick}` });
+    return;
+  }
+
+  // Conversational fast-path: refine the previous deliverable in ONE streamed
+  // call instead of the full chain. This is what makes MAGI feel like a
+  // collaborator you iterate with rather than a form that returns a report.
+  const lastAnswer = [...(history ?? [])].reverse().find((h) => h.role !== "user")?.text ?? null;
+  if (!hasFiles && isRevisionRequest(prompt, lastAnswer)) {
+    await runRevision(prompt, mode, emit, lastAnswer!, options, operator);
     return;
   }
 
@@ -89,7 +136,7 @@ export async function runMagiPipeline(
   emit({ type: "status", step: "melchior", message: "MAGI is working..." });
   const opener = await generateText({
     ...getModelPlan(mode, "melchior", geminiModel),
-    system: `${productContext}\n\n${route}\n\nYou are Melchior, the Architect — MAGI's first gate. You decide the request type and, for real work, design the blueprint the builder will follow. You do NOT write the final deliverable yourself.\nClassify, then act:\n- SIMPLE — a direct factual or conversational reply fully answers it. Answer it directly; do not pad it into a report.\n- COMPLEX — it needs a structured, multi-part deliverable. Output a PLAN, not prose: the exact sections/components it must contain, the must-have requirements (including ones the user implied but did not state), the approach to take, and the key facts or constraints to respect. Be complete — anything you leave out, the builder will not include.\n- REFUSE — clearly harmful or illegal (malware, weapons, exploitation of minors, credible violence, self-harm facilitation, fraud). Refuse in one sentence.\nWhen files are attached and the user asks you to review, analyze, summarize, extract from, or compare them, treat it as COMPLEX and have the plan cover the document thoroughly.\nBegin with exactly one tag on its own first line: [SIMPLE], [COMPLEX], or [REFUSE]. After the tag: the answer (SIMPLE), the plan (COMPLEX), or the one-sentence refusal (REFUSE).\n\n${skillPrompt("melchior")}\n\n${mcp}\n\nOutput clean Markdown. ${noWrap}\n\n${grounding}${fileContext}`,
+    system: `${productContext}${operator}\n\n${route}\n\nYou are Melchior, the Architect — MAGI's first gate. You decide the request type and, for real work, design the blueprint the builder will follow. You do NOT write the final deliverable yourself.\nClassify, then act:\n- SIMPLE — a direct factual or conversational reply fully answers it. Answer it directly; do not pad it into a report.\n- COMPLEX — it needs a structured, multi-part deliverable. Output a PLAN, not prose: the exact sections/components it must contain, the must-have requirements (including ones the user implied but did not state), the approach to take, and the key facts or constraints to respect. Be complete — anything you leave out, the builder will not include.\n- REFUSE — clearly harmful or illegal (malware, weapons, exploitation of minors, credible violence, self-harm facilitation, fraud). Refuse in one sentence.\nWhen files are attached and the user asks you to review, analyze, summarize, extract from, or compare them, treat it as COMPLEX and have the plan cover the document thoroughly.\nBegin with exactly one tag on its own first line: [SIMPLE], [COMPLEX], or [REFUSE]. After the tag: the answer (SIMPLE), the plan (COMPLEX), or the one-sentence refusal (REFUSE).\n\n${skillPrompt("melchior")}\n\n${mcp}\n\nOutput clean Markdown. ${noWrap}\n\n${grounding}${fileContext}`,
     prompt: historyBlock ? `${historyBlock}Current request:\n${prompt}` : prompt,
     maxTokens: 900,
     signal,
@@ -125,7 +172,7 @@ export async function runMagiPipeline(
   try {
     const maverick = await generateText({
       ...getModelPlan(mode, "balthasar", geminiModel),
-      system: `${productContext}\n\n${route}\n\nYou are Balthasar, the Maverick — the builder. You receive the Architect's plan and write the actual deliverable from it: cover every section and requirement in the plan, in full, concrete prose (or code/tables as fitting). As you build, add what a conventional execution would miss — a sharper framing, a non-obvious insight, or a real differentiator — at least one, and only where it genuinely strengthens the work, never as decoration. Follow the plan's structure; do not drop its requirements.\n\n${skillPrompt("balthasar")}\n\n${mcp}\n\nReturn the COMPLETE deliverable in Markdown. ${noWrap}\n\n${grounding}${fileContext}`,
+      system: `${productContext}${operator}\n\n${route}\n\nYou are Balthasar, the Maverick — the builder. You receive the Architect's plan and write the actual deliverable from it: cover every section and requirement in the plan, in full, concrete prose (or code/tables as fitting). As you build, add what a conventional execution would miss — a sharper framing, a non-obvious insight, or a real differentiator — at least one, and only where it genuinely strengthens the work, never as decoration. Follow the plan's structure; do not drop its requirements.\n\n${skillPrompt("balthasar")}\n\n${mcp}\n\nReturn the COMPLETE deliverable in Markdown. ${noWrap}\n\n${grounding}${fileContext}`,
       prompt: `Original request:\n${prompt}\n\nArchitect's plan to build from:\n${architectText}`,
       maxTokens: 1900,
       signal,
@@ -170,7 +217,7 @@ export async function runMagiPipeline(
     const synthesis = await generateTextStream(
       {
         ...getModelPlan(mode, "judge", geminiModel),
-        system: `${productContext}\n\n${route}\n\nYou are the Synthesis — the final voice the user sees. You receive the builder's deliverable and the Adversary's critique. Produce the finished deliverable: keep everything strong in the build, and FIX every valid point in the critique — correct or remove unsupported claims, fill the gaps, answer the objections. Ignore critique points that are wrong or pedantic. Read as one confident author.\n\n${skillPrompt("judge")}\n\nReturn ONLY the single finished deliverable in Markdown — not a list of changes, not the critique. ${noWrap} If sources are provided below, keep inline [n] citations for sourced claims.\n\n${grounding}${fileContext}`,
+        system: `${productContext}${operator}\n\n${route}\n\nYou are the Synthesis — the final voice the user sees. You receive the builder's deliverable and the Adversary's critique. Produce the finished deliverable: keep everything strong in the build, and FIX every valid point in the critique — correct or remove unsupported claims, fill the gaps, answer the objections. Ignore critique points that are wrong or pedantic. Read as one confident author.\n\n${skillPrompt("judge")}\n\nReturn ONLY the single finished deliverable in Markdown — not a list of changes, not the critique. ${noWrap} If sources are provided below, keep inline [n] citations for sourced claims.\n\n${grounding}${fileContext}`,
         // Synthesis is the final voice, so it (not just the Architect) gets the
         // conversation history — follow-ups like "make it shorter" or "now as an
         // email" keep their context all the way to the answer the user sees.
@@ -187,6 +234,15 @@ export async function runMagiPipeline(
   }
   if (!synthesisText) synthesisText = maverickText;
   complete("judge", emit);
+
+  // Surface the invisible edge: what the Adversary attacked and how grounded
+  // the answer is. Rendered as the per-answer verification panel.
+  emit({
+    type: "verification",
+    objections: parseObjections(adversaryText),
+    sourceCount,
+    revised: false,
+  });
 
   const costBreakdown = [
     { node: "Architect", cost: opener.cost ?? 0 },
@@ -209,6 +265,59 @@ export async function runMagiPipeline(
   activate("final", emit);
   emit({ type: "status", step: "final", message: "Final ruling released." });
   emit({ type: "final", answer: `The Magi has decided.\n\n${clean}` });
+  complete("final", emit);
+}
+
+// Single-call revision of the previous deliverable: one streamed Synthesis-tier
+// pass, seconds instead of the full chain. The trace shows scan/route done and
+// jumps straight to the Synthesis node.
+async function runRevision(
+  prompt: string,
+  mode: MagiMode,
+  emit: Emit,
+  lastAnswer: string,
+  options: PipelineOptions,
+  operator: string
+) {
+  emit({ type: "status", step: "scan", message: "MAGI is revising the last deliverable..." });
+  complete("scan", emit);
+  complete("route", emit);
+  activate("judge", emit);
+  emit({ type: "answer_start" });
+
+  let text = "";
+  let cost = 0;
+  try {
+    const result = await generateTextStream(
+      {
+        ...getModelPlan(mode, "judge", options.geminiModel),
+        system: `${productContext}${operator}\n\nYou are MAGI's revision editor. The operator wants a change to the previous deliverable. Apply EXACTLY the requested change; keep everything the request doesn't touch — same facts, same substance, no re-imagining. Return ONLY the complete revised deliverable in Markdown, no preamble, no commentary, no mention of these instructions.`,
+        prompt: `Previous deliverable:\n${lastAnswer}\n\nRequested change:\n${prompt}`,
+        maxTokens: 2200,
+        signal: options.signal,
+      },
+      (piece) => emit({ type: "delta", text: piece })
+    );
+    text = result.text;
+    cost = result.cost ?? 0;
+  } catch {
+    /* fall through to the apology below */
+  }
+
+  if (!text) {
+    emit({
+      type: "final",
+      answer: "MAGI couldn't apply that revision. The previous deliverable is unchanged — please try again.",
+    });
+    complete("judge", emit);
+    return;
+  }
+
+  emit({ type: "verification", objections: [], sourceCount: 0, revised: true });
+  emit({ type: "cost", total: cost, mode, breakdown: [{ node: "Revision", cost }] });
+  complete("judge", emit);
+  activate("final", emit);
+  emit({ type: "final", answer: `The Magi has decided.\n\n${cleanFinalAnswer(text)}` });
   complete("final", emit);
 }
 

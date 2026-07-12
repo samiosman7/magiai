@@ -96,6 +96,24 @@ confirm a capped/blocked run shows the clean capacity message.
 - **Tests**: `npm test` (vitest). Covers text-utils + spend-cap logic. Add tests with new logic.
 - **Logs**: `/api/magi` emits structured `magi.start` / `magi.done` / `magi.error` lines (request id, mode, cost, latency) — greppable in Vercel logs.
 
+## The "feels like an AI" layer (added — Fable 5 session)
+Five fixes that turn MAGI from a form-that-returns-a-report into a collaborator:
+
+- **Conversational revision fast-path** — refinement follow-ups ("make it shorter",
+  "turn this into an email") skip the 4-node chain and run ONE streamed revision call
+  seeded with the prior deliverable: seconds, not 40s. Post-answer follow-up chips
+  invite iteration. (`isRevisionRequest` in pipeline.ts.)
+- **Operator memory** — MAGI learns durable facts about each user from runs (cheap
+  extraction pass after success) + user-set standing instructions; both injected into
+  every run and fully visible/editable in the console's "MAGI memory" panel
+  (`/api/memory`, `lib/magi/memory.ts`). **Needs the `magi_memory` table — re-run
+  `supabase/schema.sql`** (idempotent). Fails open until then.
+- **Visible verification** — every full-chain answer carries a "✓ Verified" panel:
+  the Adversary's objections (resolved by Synthesis) + how many sources grounded it.
+- **Real Word export** — every answer downloads as a native .docx
+  (`lib/export/docx.ts`, `/api/export/docx`; headings/bold/lists/quotes styled).
+- **Thread persistence** — the conversation survives reloads (localStorage).
+
 ## Public freemium & spend guardrails (added — Fable 5 session)
 **The release-day money protection.** Three layers so a stampede can't drain your wallet:
 

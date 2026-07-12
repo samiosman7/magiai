@@ -27,11 +27,18 @@ function renderMarkdown(text: string): string {
 type PipelineStep = "scan" | "route" | "melchior" | "balthasar" | "casper" | "judge" | "final";
 type StepState = "" | "active" | "done";
 
+type Verification = {
+  objections: string[];
+  sourceCount: number;
+  revised: boolean;
+};
+
 type Message = {
   id: string;
   kind: "user" | "magi" | "status";
   text: string;
   downloadPrompt?: string;
+  verification?: Verification;
 };
 
 type NodeOutput = {
@@ -141,6 +148,7 @@ type MagiEvent =
   | { type: "cost"; total: number; mode: string; breakdown: Array<{ node: string; cost: number }> }
   | { type: "answer_start" }
   | { type: "delta"; text: string }
+  | { type: "verification"; objections: string[]; sourceCount: number; revised: boolean }
   | { type: "final"; answer: string }
   | { type: "error"; message: string };
 
@@ -173,6 +181,13 @@ const heroRoles: Array<{ code: string; name: string; desc: string }> = [
   { code: "BALTHASAR·02", name: "Maverick", desc: "builds it with the bold angle" },
   { code: "CASPER·03", name: "Adversary", desc: "attacks every weak claim" },
   { code: "SYNTHESIS", name: "Judge", desc: "forges the final verdict" },
+];
+
+// Post-answer iteration nudges — the "keep working with it" affordance.
+const followUps = [
+  "Tighten it — cut it by 30%",
+  "Turn this into an email",
+  "What's the weakest part of this?",
 ];
 
 const examplePrompts = [
@@ -244,10 +259,15 @@ export default function Home() {
   const [dragActive, setDragActive] = useState(false);
   const [trial, setTrial] = useState<{ limit: number; used: number; remaining: number } | null>(null);
   const [signupWall, setSignupWall] = useState(false);
+  const [memoryFacts, setMemoryFacts] = useState<string[]>([]);
+  const [instructionsDraft, setInstructionsDraft] = useState("");
+  const [instructionsSaved, setInstructionsSaved] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const currentPromptRef = useRef("");
   const streamingIdRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const pendingVerificationRef = useRef<Verification | null>(null);
+  const threadRestoredRef = useRef(false);
 
   const hasMessages = messages.length > 0;
   // Developer panels are hidden by default; append ?dev=1 to inspect internals.
@@ -361,7 +381,61 @@ export default function Home() {
         setCostByMode({});
       }
     }
+
+    // Restore the conversation — a reload should never wipe the thread.
+    const storedThread = window.localStorage.getItem("magi.thread");
+    if (storedThread) {
+      try {
+        const thread = JSON.parse(storedThread) as Message[];
+        if (Array.isArray(thread) && thread.length) setMessages(thread);
+      } catch {
+        /* corrupted thread — start fresh */
+      }
+    }
+    threadRestoredRef.current = true;
   }, []);
+
+  // Persist the thread (drop transient status lines; keep the conversation).
+  useEffect(() => {
+    if (!threadRestoredRef.current) return;
+    const durable = messages.filter((m) => m.kind !== "status").slice(-40);
+    window.localStorage.setItem("magi.thread", JSON.stringify(durable));
+  }, [messages]);
+
+  // Load what MAGI remembers about this operator (shown + editable in the dossier).
+  const refreshMemory = (opId: string) => {
+    if (!opId) return;
+    fetch("/api/memory", { headers: { "x-magi-user-id": opId } })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: { facts?: string[]; standingInstructions?: string } | null) => {
+        if (!data) return;
+        setMemoryFacts(Array.isArray(data.facts) ? data.facts : []);
+        setInstructionsDraft(typeof data.standingInstructions === "string" ? data.standingInstructions : "");
+      })
+      .catch(() => null);
+  };
+
+  useEffect(() => {
+    if (operatorId) refreshMemory(operatorId);
+  }, [operatorId, accountEmail]);
+
+  async function saveInstructions() {
+    const response = await fetch("/api/memory", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", "x-magi-user-id": operatorId },
+      body: JSON.stringify({ standingInstructions: instructionsDraft }),
+    });
+    if (response.ok) {
+      setInstructionsSaved(true);
+      setTimeout(() => setInstructionsSaved(false), 2000);
+    }
+  }
+
+  async function forgetMemory() {
+    await fetch("/api/memory", { method: "DELETE", headers: { "x-magi-user-id": operatorId } });
+    setMemoryFacts([]);
+    setInstructionsDraft("");
+  }
 
   useEffect(() => {
     if (!operatorId) return;
@@ -445,6 +519,31 @@ export default function Home() {
     setAttachments((current) => current.filter((a) => a.id !== id));
   }
 
+  async function downloadDocx(text: string) {
+    const firstHeading = text.match(/^#{1,3}\s+(.+)$/m)?.[1]?.slice(0, 80);
+    const response = await fetch("/api/export/docx", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-magi-user-id": operatorId },
+      body: JSON.stringify({ markdown: text, title: firstHeading }),
+    });
+    if (!response.ok) {
+      setMessages((current) => [
+        ...current,
+        { id: createId(), kind: "status", text: "Word export failed. Try again in a moment." },
+      ]);
+      return;
+    }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "magi-deliverable.docx";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+
   // Enter sends; Shift+Enter makes a newline. Matches every modern chat UI.
   function handlePromptKeyDown(event: ReactKeyboardEvent<HTMLTextAreaElement>) {
     if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
@@ -469,9 +568,13 @@ export default function Home() {
     if (event.dataTransfer.files?.length) uploadFiles(event.dataTransfer.files);
   }
 
-  async function submitPrompt(event: FormEvent<HTMLFormElement>) {
+  function submitPrompt(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const trimmed = prompt.trim();
+    void startRun(prompt);
+  }
+
+  async function startRun(rawText: string) {
+    const trimmed = rawText.trim();
     const readyFiles = attachments.filter((a) => a.ok);
     // A run needs either a prompt or at least one readable file.
     if ((!trimmed && readyFiles.length === 0) || isRunning || uploading) return;
@@ -500,6 +603,7 @@ export default function Home() {
     setArtifacts([]);
     setRunCost(null);
     streamingIdRef.current = null;
+    pendingVerificationRef.current = null;
 
     try {
       const response = await fetch("/api/magi", {
@@ -599,6 +703,8 @@ export default function Home() {
     } finally {
       setIsRunning(false);
       refreshBilling(operatorId);
+      // Memory extraction runs server-side after the answer; give it a beat.
+      setTimeout(() => refreshMemory(operatorId), 4000);
     }
   }
 
@@ -652,6 +758,15 @@ export default function Home() {
       return;
     }
 
+    if (event.type === "verification") {
+      pendingVerificationRef.current = {
+        objections: event.objections,
+        sourceCount: event.sourceCount,
+        revised: event.revised,
+      };
+      return;
+    }
+
     if (event.type === "answer_start") {
       const id = createId();
       streamingIdRef.current = id;
@@ -688,12 +803,14 @@ export default function Home() {
       }
       const streamId = streamingIdRef.current;
       streamingIdRef.current = null;
+      const verification = pendingVerificationRef.current ?? undefined;
+      pendingVerificationRef.current = null;
       if (streamId) {
         // Finalize the streamed bubble with the authoritative, cleaned answer.
         setMessages((current) =>
           current.map((message) =>
             message.id === streamId
-              ? { ...message, text: event.answer, downloadPrompt: latestWebsitePrompt(current) }
+              ? { ...message, text: event.answer, downloadPrompt: latestWebsitePrompt(current), verification }
               : message
           )
         );
@@ -705,6 +822,7 @@ export default function Home() {
             kind: "magi",
             text: event.answer,
             downloadPrompt: latestWebsitePrompt(current),
+            verification,
           },
         ]);
       }
@@ -971,38 +1089,84 @@ export default function Home() {
           )}
 
           <div className="messages">
-            {messages.map((message) => (
-              <article className={`message ${message.kind}`} key={message.id}>
-                {message.kind === "magi" ? (
-                  <>
-                    <span className="msg-tag" aria-hidden="true">MAGI · verdict</span>
-                    <div
-                      className="message-md"
-                      dangerouslySetInnerHTML={{ __html: renderMarkdown(message.text) }}
-                    />
-                    {message.text && (
-                      <div className="msg-tools">
-                        <button type="button" onClick={() => copyText(message.text)}>Copy</button>
-                        <button type="button" onClick={() => downloadMarkdown(message.text)}>
-                          Download .md
-                        </button>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  message.text
-                )}
-                {message.downloadPrompt && (
-                  <button
-                    className="download-button"
-                    type="button"
-                    onClick={() => downloadProject(message.downloadPrompt!)}
-                  >
-                    Generate and download website files
-                  </button>
-                )}
-              </article>
-            ))}
+            {messages.map((message, index) => {
+              const isLastMagi =
+                message.kind === "magi" &&
+                index === messages.map((m) => m.kind).lastIndexOf("magi");
+              return (
+                <article className={`message ${message.kind}`} key={message.id}>
+                  {message.kind === "magi" ? (
+                    <>
+                      <span className="msg-tag" aria-hidden="true">
+                        {message.verification?.revised ? "MAGI · revision" : "MAGI · verdict"}
+                      </span>
+                      <div
+                        className="message-md"
+                        dangerouslySetInnerHTML={{ __html: renderMarkdown(message.text) }}
+                      />
+                      {message.verification && !message.verification.revised && (
+                        <details className="verify-panel">
+                          <summary>
+                            <span className="verify-badge">✓ Verified</span>
+                            {message.verification.objections.length > 0
+                              ? ` ${message.verification.objections.length} objection${message.verification.objections.length === 1 ? "" : "s"} raised & resolved`
+                              : " adversarial review passed"}
+                            {message.verification.sourceCount > 0 &&
+                              ` · checked against ${message.verification.sourceCount} source${message.verification.sourceCount === 1 ? "" : "s"}`}
+                          </summary>
+                          {message.verification.objections.length > 0 ? (
+                            <ol className="verify-objections">
+                              {message.verification.objections.map((objection, i) => (
+                                <li key={i}>{objection}</li>
+                              ))}
+                            </ol>
+                          ) : (
+                            <p className="verify-none">
+                              The Adversary found no substantive weaknesses to flag in the build.
+                            </p>
+                          )}
+                          <p className="verify-note">
+                            Casper·03 attacked the draft; the Synthesis resolved every valid objection before
+                            you saw this answer.
+                          </p>
+                        </details>
+                      )}
+                      {message.text && (
+                        <div className="msg-tools">
+                          <button type="button" onClick={() => copyText(message.text)}>Copy</button>
+                          <button type="button" onClick={() => downloadMarkdown(message.text)}>
+                            .md
+                          </button>
+                          <button type="button" onClick={() => downloadDocx(message.text)}>
+                            Word .docx
+                          </button>
+                        </div>
+                      )}
+                      {isLastMagi && !isRunning && message.text && (
+                        <div className="follow-ups" aria-label="Follow-up suggestions">
+                          {followUps.map((chip) => (
+                            <button key={chip} type="button" onClick={() => startRun(chip)}>
+                              {chip}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    message.text
+                  )}
+                  {message.downloadPrompt && (
+                    <button
+                      className="download-button"
+                      type="button"
+                      onClick={() => downloadProject(message.downloadPrompt!)}
+                    >
+                      Generate and download website files
+                    </button>
+                  )}
+                </article>
+              );
+            })}
           </div>
         </section>
 
@@ -1342,6 +1506,44 @@ export default function Home() {
           </div>
         </details>
         )}
+
+        <details className="node-card" open>
+          <summary>MAGI memory</summary>
+          <div className="memory-box">
+            {memoryFacts.length > 0 ? (
+              <ul className="memory-facts">
+                {memoryFacts.map((fact) => (
+                  <li key={fact}>{fact}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="memory-empty">
+                Nothing remembered yet — MAGI learns durable facts about you from your runs.
+              </p>
+            )}
+            <label className="memory-label" htmlFor="standingInstructions">
+              Standing instructions (always applied)
+            </label>
+            <textarea
+              id="standingInstructions"
+              className="memory-instructions"
+              rows={3}
+              placeholder="e.g. I run a design studio. Keep answers concise. Always include next steps."
+              value={instructionsDraft}
+              onChange={(event) => setInstructionsDraft(event.target.value)}
+            />
+            <div className="memory-actions">
+              <button type="button" onClick={saveInstructions}>
+                {instructionsSaved ? "Saved ✓" : "Save"}
+              </button>
+              {(memoryFacts.length > 0 || instructionsDraft) && (
+                <button type="button" className="memory-forget" onClick={forgetMemory}>
+                  Forget everything
+                </button>
+              )}
+            </div>
+          </div>
+        </details>
 
         <details className="node-card">
           <summary>Workspace history</summary>

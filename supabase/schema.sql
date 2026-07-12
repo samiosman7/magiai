@@ -103,6 +103,18 @@ alter table public.magi_spend enable row level security;
 
 create index if not exists magi_spend_day_idx on public.magi_spend(day);
 
+-- MAGI's per-operator memory: durable facts learned from runs + the operator's
+-- standing instructions. One row per user; written via the service role.
+create table if not exists public.magi_memory (
+  clerk_user_id text primary key,
+  facts jsonb not null default '[]'::jsonb,
+  standing_instructions text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.magi_memory enable row level security;
+
 -- Durable fixed-window rate limiting for public endpoints (access code, waitlist),
 -- so limits survive serverless instance churn. Written via the service role only;
 -- fixed windows keyed by (bucket, window_start-epoch-ms). Fails open if absent.

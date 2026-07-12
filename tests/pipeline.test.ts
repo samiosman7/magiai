@@ -20,11 +20,11 @@ vi.mock("@/lib/magi/search", () => ({
   buildGrounding: () => ({ block: "", sourcesList: "" }),
 }));
 
-import { runMagiPipeline } from "@/lib/magi/pipeline";
+import { runMagiPipeline, isRevisionRequest, parseObjections } from "@/lib/magi/pipeline";
 
 async function run(prompt: string, attachments: Attachment[] = []): Promise<MagiEvent[]> {
   const events: MagiEvent[] = [];
-  await runMagiPipeline(prompt, "standard", (e) => events.push(e), undefined, undefined, undefined, attachments);
+  await runMagiPipeline(prompt, "standard", (e) => events.push(e), { attachments });
   return events;
 }
 
@@ -78,5 +78,67 @@ describe("runMagiPipeline", () => {
     ]);
     const task = events.find((e) => e.type === "task") as { profile: { kind: string } } | undefined;
     expect(task?.profile.kind).toBe("legal");
+  });
+
+  it("emits a verification event on full-chain runs", async () => {
+    const events = await run("Draft a go-to-market plan for a B2B SaaS");
+    const verification = events.find((e) => e.type === "verification");
+    expect(verification).toBeTruthy();
+    expect((verification as { revised: boolean }).revised).toBe(false);
+  });
+
+  it("takes the single-call revision path for a refinement follow-up", async () => {
+    const prior = "# Plan\n" + "Detailed prior deliverable content. ".repeat(20);
+    const events: MagiEvent[] = [];
+    await runMagiPipeline("make it shorter", "standard", (e) => events.push(e), {
+      history: [
+        { role: "user", text: "Draft a plan" },
+        { role: "assistant", text: prior },
+      ],
+    });
+    // Revision path: no task/artifact events (no router), one Revision cost node.
+    expect(events.some((e) => e.type === "task")).toBe(false);
+    const cost = events.find((e) => e.type === "cost") as { breakdown: Array<{ node: string }> };
+    expect(cost.breakdown.map((b) => b.node)).toEqual(["Revision"]);
+    const verification = events.find((e) => e.type === "verification") as { revised: boolean };
+    expect(verification.revised).toBe(true);
+    expect(events.some((e) => e.type === "final")).toBe(true);
+  });
+});
+
+describe("isRevisionRequest", () => {
+  const prior = "x".repeat(300);
+
+  it("detects refinement phrasing against a prior answer", () => {
+    expect(isRevisionRequest("make it shorter", prior)).toBe(true);
+    expect(isRevisionRequest("turn this into an email", prior)).toBe(true);
+    expect(isRevisionRequest("rewrite in a formal tone", prior)).toBe(true);
+  });
+
+  it("never fires without a substantial prior answer", () => {
+    expect(isRevisionRequest("make it shorter", null)).toBe(false);
+    expect(isRevisionRequest("make it shorter", "short")).toBe(false);
+  });
+
+  it("does not hijack new work or long requests", () => {
+    expect(isRevisionRequest("research solid-state batteries with sources", prior)).toBe(false);
+    expect(isRevisionRequest("what's the capital of France", prior)).toBe(false);
+    expect(isRevisionRequest(`make it shorter ${"and better ".repeat(40)}`, prior)).toBe(false);
+  });
+});
+
+describe("parseObjections", () => {
+  it("splits a numbered critique into discrete objections", () => {
+    const critique =
+      "1. The pricing claim is unsupported by any source.\n2) The timeline ignores onboarding.\n3. No competitor analysis.";
+    const objections = parseObjections(critique);
+    expect(objections).toHaveLength(3);
+    expect(objections[0]).toContain("pricing claim");
+    expect(objections[1]).toContain("timeline");
+  });
+
+  it("returns empty for prose without numbering", () => {
+    expect(parseObjections("Looks solid overall.")).toEqual([]);
+    expect(parseObjections("")).toEqual([]);
   });
 });

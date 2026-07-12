@@ -2,6 +2,7 @@ import { checkCreditAccess, recordRunAndChargeCredits } from "@/lib/billing/cred
 import { checkSpendLimits, recordSpend } from "@/lib/billing/spend";
 import { accountRequired, getRequestUser } from "@/lib/auth/user";
 import { runMagiPipeline } from "@/lib/magi/pipeline";
+import { buildOperatorContext, getMemory, updateMemoryFromRun } from "@/lib/magi/memory";
 import type { GeminiModel, MagiEvent, MagiMode } from "@/lib/magi/types";
 import type { Attachment, AttachmentKind } from "@/lib/magi/attachments";
 import { MAX_FILES, PER_FILE_CHAR_CAP } from "@/lib/magi/attachments";
@@ -60,14 +61,24 @@ export async function POST(request: Request) {
     attachments?: unknown;
   } | null;
 
-  const history = Array.isArray(body?.history)
+  const rawHistory = Array.isArray(body?.history)
     ? (body.history as unknown[])
         .filter(
           (h): h is { role: string; text: string } =>
             !!h && typeof (h as { text?: unknown }).text === "string"
         )
         .slice(-8)
-        .map((h) => ({ role: h.role === "user" ? "user" : "assistant", text: h.text.slice(0, 2000) }))
+    : [];
+  const lastAssistantIdx = rawHistory.map((h) => h.role).lastIndexOf("magi") !== -1
+    ? rawHistory.map((h) => h.role).lastIndexOf("magi")
+    : rawHistory.map((h) => h.role !== "user").lastIndexOf(true);
+  const history = rawHistory.length
+    ? rawHistory.map((h, i) => ({
+        role: h.role === "user" ? "user" : "assistant",
+        // The most recent deliverable keeps more room — the revision fast-path
+        // edits it verbatim, so truncating it would silently drop content.
+        text: h.text.slice(0, i === lastAssistantIdx ? 9000 : 2000),
+      }))
     : undefined;
 
   // Attachments come back from /api/files/extract already parsed; the client
@@ -191,7 +202,16 @@ export async function POST(request: Request) {
           name: "Credit gate",
           text: `${creditCheck.creditsRequired} credits authorized for ${mode} mode.`,
         });
-        await runMagiPipeline(prompt, mode, emit, geminiModel, request.signal, history, attachments);
+        // Operator memory: what MAGI knows about this user, injected into the run.
+        const memory = await getMemory(userId).catch(() => null);
+        const operatorContext = memory ? buildOperatorContext(memory) : "";
+        await runMagiPipeline(prompt, mode, emit, {
+          geminiModel,
+          signal: request.signal,
+          history,
+          attachments,
+          operatorContext,
+        });
         succeeded = true;
       } catch (error) {
         // Graceful failure: clean user-facing message, and don't charge for a broken run.
@@ -217,6 +237,10 @@ export async function POST(request: Request) {
         // Burn a free-trial slot only on a successful anonymous run.
         if (publicMode && isAnonymous && succeeded) {
           await recordAnonymousTrialRun(clientIp).catch(() => null);
+        }
+        // Learn from the run (fire-and-forget; never delays or breaks the response).
+        if (succeeded && finalAnswer) {
+          void updateMemoryFromRun(userId, prompt, finalAnswer).catch(() => null);
         }
         controller.close();
       }

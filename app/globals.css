@@ -505,6 +505,178 @@ button:disabled {
   color: var(--accent-2);
 }
 
+/* per-answer verification panel — the visible edge */
+.verify-panel {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(61, 220, 151, 0.28);
+  border-radius: 8px;
+  background: rgba(61, 220, 151, 0.05);
+}
+
+.verify-panel summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.8rem;
+  list-style: none;
+}
+
+.verify-panel summary::-webkit-details-marker {
+  display: none;
+}
+
+.verify-badge {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 2px 8px;
+  border-radius: 5px;
+  background: rgba(61, 220, 151, 0.15);
+  color: var(--green);
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.verify-objections {
+  margin: 10px 0 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 6px;
+}
+
+.verify-objections li {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.verify-none {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.verify-note {
+  margin: 10px 0 0;
+  color: var(--dim);
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+
+/* post-answer follow-up chips */
+.follow-ups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.follow-ups button {
+  padding: 7px 13px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.follow-ups button:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--text);
+  filter: none;
+}
+
+/* MAGI memory panel */
+.memory-box {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.memory-facts {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.memory-facts li {
+  position: relative;
+  padding: 7px 10px 7px 26px;
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.memory-facts li::before {
+  content: "◆";
+  position: absolute;
+  left: 10px;
+  color: var(--accent-2);
+  font-size: 0.6rem;
+  line-height: 1.9;
+}
+
+.memory-empty {
+  margin: 0;
+  color: var(--dim);
+  font-size: 0.82rem;
+}
+
+.memory-label {
+  color: var(--dim);
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.memory-instructions {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 0.84rem;
+  resize: vertical;
+}
+
+.memory-instructions:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.memory-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.memory-actions button {
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 0.78rem;
+}
+
+.memory-actions button:hover:not(:disabled) {
+  border-color: var(--accent);
+  filter: none;
+}
+
+.memory-forget {
+  color: var(--dim) !important;
+}
+
 .msg-tools {
   display: flex;
   gap: 8px;

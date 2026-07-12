@@ -91,5 +91,8 @@ export type MagiEvent =
   | { type: "cost"; total: number; mode: string; breakdown: Array<{ node: string; cost: number }> }
   | { type: "answer_start" }
   | { type: "delta"; text: string }
+  // How the answer was verified: the Adversary's objections (resolved by Synthesis)
+  // and how many real sources grounded it. Rendered as the per-answer trust panel.
+  | { type: "verification"; objections: string[]; sourceCount: number; revised: boolean }
   | { type: "final"; answer: string }
   | { type: "error"; message: string };
