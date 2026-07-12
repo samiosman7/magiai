@@ -96,6 +96,25 @@ confirm a capped/blocked run shows the clean capacity message.
 - **Tests**: `npm test` (vitest). Covers text-utils + spend-cap logic. Add tests with new logic.
 - **Logs**: `/api/magi` emits structured `magi.start` / `magi.done` / `magi.error` lines (request id, mode, cost, latency) — greppable in Vercel logs.
 
+## Public freemium & spend guardrails (added — Fable 5 session)
+**The release-day money protection.** Three layers so a stampede can't drain your wallet:
+
+1. **Free-trial wall** — in **public mode** (no `MAGI_BETA_CODE`), unsigned visitors get
+   `MAGI_FREE_TRIAL_RUNS` (default **5**) successful runs, counted per IP (durable, in
+   `magi_rate_limits`) so clearing localStorage doesn't reset it. Then `/api/magi` returns
+   `402 {signupRequired}` and the console shows a signup wall → Free plan (10 credits/mo) →
+   subscribe. Only successful runs burn a slot. Private beta (`MAGI_BETA_CODE` set) skips the
+   wall. Toggle count with `MAGI_FREE_TRIAL_RUNS`, window with `MAGI_TRIAL_WINDOW_DAYS` (30).
+2. **Per-user caps** apply ALWAYS now (not just when billing is on): anonymous callers resolve
+   to the **Free plan**, so even the free beta is bounded to free-tier daily limits ($/runs).
+3. **Global ceilings** — `MAGI_DAILY_USD_CAP` (default $20/day) and the NEW
+   **`MAGI_MONTHLY_USD_CAP` (default $100/month)** — the hard wallet cap; daily alone allowed
+   ~30× that. Plus `MAGI_USER_MONTHLY_USD_CAP` (default $5). All fail open only if Supabase is
+   down; the `MAGI_EMERGENCY_STOP` kill switch is the zero-dependency backstop.
+
+**Going public:** unset `MAGI_BETA_CODE` (that alone makes `/console` publicly reachable; the
+trial wall then gates). Keep it set to stay invite-only. Landing has a "Try 5 free runs" CTA → `/console`.
+
 ## Rate limiting (added — Fable 5 session)
 - **Public endpoints** are IP-limited: `/api/access` (beta-code brute-force guard,
   10 / IP / 10 min) and `/api/waitlist` (spam guard, 8 / IP / hour). Authenticated

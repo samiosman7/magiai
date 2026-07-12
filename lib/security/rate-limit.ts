@@ -101,6 +101,57 @@ export async function checkRateLimitDurable({
   }
 }
 
+// ── Anonymous free-trial metering ──────────────────────────────────────────
+// Public freemium: unsigned visitors get N free runs before a signup wall.
+// Counted per IP in the durable table (localStorage is the client-side UX number,
+// but the IP count is the authoritative backstop so clearing storage doesn't reset
+// the trial). Increment happens only on a SUCCESSFUL run, never a refusal/error.
+export const FREE_TRIAL_RUNS = Number(process.env.MAGI_FREE_TRIAL_RUNS || 5);
+const TRIAL_WINDOW_MS = Number(process.env.MAGI_TRIAL_WINDOW_DAYS || 30) * 24 * 60 * 60 * 1000;
+
+function trialWindowStart() {
+  return Math.floor(Date.now() / TRIAL_WINDOW_MS) * TRIAL_WINDOW_MS;
+}
+
+// How many free runs this IP has used in the current window. Fails open (0) if the
+// table is absent, so the wall is simply inactive until the migration runs.
+export async function getAnonymousTrialUsed(ip: string): Promise<number> {
+  if (!hasSupabaseConfig()) return 0;
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+      .from("magi_rate_limits")
+      .select("count")
+      .eq("bucket", `trial:${ip}`)
+      .eq("window_start", trialWindowStart())
+      .maybeSingle();
+    if (error) return 0;
+    return Number(data?.count ?? 0);
+  } catch {
+    return 0;
+  }
+}
+
+export async function recordAnonymousTrialRun(ip: string): Promise<void> {
+  if (!hasSupabaseConfig()) return;
+  try {
+    const supabase = getSupabaseAdmin();
+    const windowStart = trialWindowStart();
+    const bucket = `trial:${ip}`;
+    const { data } = await supabase
+      .from("magi_rate_limits")
+      .select("count")
+      .eq("bucket", bucket)
+      .eq("window_start", windowStart)
+      .maybeSingle();
+    await supabase
+      .from("magi_rate_limits")
+      .upsert({ bucket, window_start: windowStart, count: Number(data?.count ?? 0) + 1 }, { onConflict: "bucket,window_start" });
+  } catch {
+    // best-effort; never fail a completed run on a trial-count write
+  }
+}
+
 // One call to guard a public endpoint by IP: in-memory burst floor + durable
 // cross-instance window. Returns a 429 Response to short-circuit, or null to proceed.
 export async function guardByIp(

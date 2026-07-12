@@ -198,8 +198,11 @@ export default function Waitlist() {
 
         {form}
         {status === "error" && <p className="lp-error">{message}</p>}
+        <p className="lp-try">
+          <Link href="/console">Try 5 free runs now — no signup needed →</Link>
+        </p>
         {status !== "done" && (
-          <p className="lp-micro">Onboarding in small waves. No spam — one email when your access opens.</p>
+          <p className="lp-micro">Or join the waitlist for launch updates. No spam.</p>
         )}
 
         <div className="lp-demo" aria-label="Example MAGI run">

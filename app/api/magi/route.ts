@@ -5,7 +5,14 @@ import { runMagiPipeline } from "@/lib/magi/pipeline";
 import type { GeminiModel, MagiEvent, MagiMode } from "@/lib/magi/types";
 import type { Attachment, AttachmentKind } from "@/lib/magi/attachments";
 import { MAX_FILES, PER_FILE_CHAR_CAP } from "@/lib/magi/attachments";
-import { checkRateLimit, rateLimitResponse } from "@/lib/security/rate-limit";
+import {
+  checkRateLimit,
+  rateLimitResponse,
+  getClientIp,
+  getAnonymousTrialUsed,
+  recordAnonymousTrialRun,
+  FREE_TRIAL_RUNS,
+} from "@/lib/security/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -105,6 +112,26 @@ export async function POST(request: Request) {
     return Response.json({ error: "Prompt is too long for this MAGI tier." }, { status: 413 });
   }
 
+  // Public freemium: unsigned visitors get FREE_TRIAL_RUNS free runs, then a signup
+  // wall. Only active in public mode (no beta code); private-beta invitees skip it and
+  // run under the daily/monthly caps. Signed-in users use the normal credit/plan system.
+  const publicMode = !process.env.MAGI_BETA_CODE;
+  const isAnonymous = !user.authenticated;
+  const clientIp = getClientIp(request);
+  if (publicMode && isAnonymous) {
+    const used = await getAnonymousTrialUsed(clientIp);
+    if (used >= FREE_TRIAL_RUNS) {
+      return Response.json(
+        {
+          error: `You've used your ${FREE_TRIAL_RUNS} free runs. Create a free account to keep going — it takes 10 seconds.`,
+          signupRequired: true,
+          freeTrialRuns: FREE_TRIAL_RUNS,
+        },
+        { status: 402 }
+      );
+    }
+  }
+
   const creditCheck = await checkCreditAccess(userId, mode, prompt);
   if (!creditCheck.allowed) {
     return Response.json(
@@ -116,16 +143,15 @@ export async function POST(request: Request) {
     );
   }
 
-  // Spend guard: kill switch + daily caps, BEFORE any model call. Plan caps apply
-  // only once billing is enforced — during the free beta the env caps rule.
-  // Blocked => clean capacity message as a normal NDJSON stream (HTTP 200),
-  // never a raw error, zero spend.
-  const spend = await checkSpendLimits(
-    userId,
-    process.env.MAGI_REQUIRE_BILLING === "true"
-      ? { dailyRuns: creditCheck.plan.dailyRuns, dailyUsd: creditCheck.plan.dailyUsd }
-      : undefined
-  );
+  // Spend guard: kill switch + global/per-user caps, BEFORE any model call.
+  // Plan caps apply ALWAYS — even during the free beta (billing off), anonymous
+  // callers resolve to the Free plan, so the free-tier daily limits ($/runs) bound
+  // a release-day flood instead of the looser env fallback. Blocked => clean
+  // capacity message as a normal NDJSON stream (HTTP 200), never a raw error, zero spend.
+  const spend = await checkSpendLimits(userId, {
+    dailyRuns: creditCheck.plan.dailyRuns,
+    dailyUsd: creditCheck.plan.dailyUsd,
+  });
   if (!spend.allowed) {
     const body =
       `${JSON.stringify({ type: "status", step: "final", message: "Capacity" })}\n` +
@@ -188,6 +214,10 @@ export async function POST(request: Request) {
         }).catch(() => null);
         // Record real cost actually incurred (even on failure) so caps stay accurate.
         await recordSpend(userId, runCostUsd).catch(() => null);
+        // Burn a free-trial slot only on a successful anonymous run.
+        if (publicMode && isAnonymous && succeeded) {
+          await recordAnonymousTrialRun(clientIp).catch(() => null);
+        }
         controller.close();
       }
     },

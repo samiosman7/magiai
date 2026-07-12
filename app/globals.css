@@ -612,6 +612,165 @@ button:disabled {
   align-items: stretch;
 }
 
+/* free-trial nudge + signup wall */
+.trial-nudge {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.trial-nudge.low {
+  border-color: rgba(255, 83, 32, 0.5);
+  color: var(--accent-2);
+}
+
+.trial-nudge a {
+  flex: 0 0 auto;
+  color: var(--accent-2);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.trial-nudge a:hover {
+  color: var(--accent);
+}
+
+.wall-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(6, 7, 10, 0.78);
+  backdrop-filter: blur(4px);
+  animation: rise-in 200ms ease both;
+}
+
+.wall-card {
+  position: relative;
+  width: min(460px, 100%);
+  padding: 32px 30px 26px;
+  border: 1px solid var(--line-2);
+  border-radius: 16px;
+  background: var(--panel);
+  box-shadow: 0 30px 90px var(--shadow), 0 0 60px rgba(255, 83, 32, 0.08);
+  overflow: hidden;
+  text-align: center;
+}
+
+.wall-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--accent);
+}
+
+.wall-kicker {
+  color: var(--accent-2);
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.wall-card h2 {
+  margin: 12px 0 8px;
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.wall-card > p {
+  margin: 0 0 18px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.wall-perks {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 22px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-2);
+  list-style: none;
+  text-align: left;
+}
+
+.wall-perks li {
+  position: relative;
+  padding-left: 22px;
+  color: var(--text);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.wall-perks li::before {
+  content: "▸";
+  position: absolute;
+  left: 0;
+  color: var(--accent);
+  font-family: var(--mono);
+}
+
+.wall-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.wall-primary,
+.wall-secondary {
+  flex: 1;
+  padding: 13px;
+  border-radius: 0;
+  font-weight: 800;
+  text-align: center;
+  text-decoration: none;
+}
+
+.wall-primary {
+  background: var(--accent);
+  color: #150800;
+  clip-path: var(--chamfer);
+}
+
+.wall-secondary {
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  color: var(--text);
+}
+
+.wall-secondary:hover {
+  border-color: var(--accent);
+}
+
+.wall-dismiss {
+  margin-top: 14px;
+  padding: 4px;
+  background: none;
+  color: var(--dim);
+  font-size: 0.8rem;
+  text-decoration: underline;
+}
+
+.wall-dismiss:hover {
+  color: var(--muted);
+  filter: none;
+}
+
 /* drag-and-drop file upload */
 .composer {
   position: relative;
@@ -1291,6 +1450,21 @@ button:disabled {
   font-size: 0.98rem;
   font-weight: 800;
   clip-path: var(--chamfer);
+}
+
+.lp-try {
+  margin: 16px 0 0;
+}
+
+.lp-try a {
+  color: var(--accent-2);
+  font-weight: 700;
+  font-size: 0.98rem;
+  text-decoration: none;
+}
+
+.lp-try a:hover {
+  color: var(--accent);
 }
 
 .lp-micro {

@@ -13,6 +13,7 @@ import {
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
+import { plans } from "@/lib/billing/plans";
 
 marked.setOptions({ gfm: true, breaks: true });
 
@@ -241,6 +242,8 @@ export default function Home() {
   const [attachments, setAttachments] = useState<UploadedFile[]>([]);
   const [uploading, setUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const [trial, setTrial] = useState<{ limit: number; used: number; remaining: number } | null>(null);
+  const [signupWall, setSignupWall] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const currentPromptRef = useRef("");
   const streamingIdRef = useRef<string | null>(null);
@@ -278,10 +281,17 @@ export default function Home() {
     if (!opId) return;
     fetch("/api/me", { headers: { "x-magi-user-id": opId } })
       .then((response) => (response.ok ? response.json() : null))
-      .then((data: { billing?: BillingSnapshot | null; billingEnforced?: boolean } | null) => {
-        setBilling(data?.billing ?? null);
-        setBillingEnforced(Boolean(data?.billingEnforced));
-      })
+      .then(
+        (data: {
+          billing?: BillingSnapshot | null;
+          billingEnforced?: boolean;
+          trial?: { limit: number; used: number; remaining: number } | null;
+        } | null) => {
+          setBilling(data?.billing ?? null);
+          setBillingEnforced(Boolean(data?.billingEnforced));
+          setTrial(data?.trial ?? null);
+        }
+      )
       .catch(() => null);
   };
 
@@ -518,6 +528,23 @@ export default function Home() {
         }),
         signal: controller.signal,
       });
+
+      if (response.status === 402) {
+        // Free trial exhausted → signup wall (or out of credits when billing is on).
+        const data = (await response.json().catch(() => null)) as { signupRequired?: boolean; error?: string } | null;
+        // Roll back the just-added user bubble; the wall carries the message.
+        setMessages((current) => current.slice(0, -1));
+        if (data?.signupRequired) {
+          setSignupWall(true);
+        } else {
+          setMessages((current) => [
+            ...current,
+            { id: createId(), kind: "status", text: data?.error || "You're out of credits. Upgrade to keep going." },
+          ]);
+        }
+        refreshBilling(operatorId);
+        return;
+      }
 
       if (response.status === 401) {
         const data = (await response.json().catch(() => null)) as { signInRequired?: boolean } | null;
@@ -850,6 +877,33 @@ export default function Home() {
 
   return (
     <main className="shell">
+      {signupWall && (
+        <div className="wall-overlay" role="dialog" aria-modal="true" aria-label="Sign up to continue">
+          <div className="wall-card">
+            <span className="wall-kicker">Free trial complete</span>
+            <h2>You&rsquo;ve seen what MAGI can do.</h2>
+            <p>
+              That was your {trial?.limit ?? 5} free runs. Create a free account to keep going — no card needed.
+            </p>
+            <ul className="wall-perks">
+              <li>{plans.free.monthlyCredits} verified runs every month, free</li>
+              <li>Saved history &amp; exportable deliverables</li>
+              <li>Upgrade any time for premium models &amp; higher limits</li>
+            </ul>
+            <div className="wall-actions">
+              <a className="wall-primary" href="/login">
+                Create free account
+              </a>
+              <a className="wall-secondary" href="/#pricing">
+                See plans
+              </a>
+            </div>
+            <button className="wall-dismiss" type="button" onClick={() => setSignupWall(false)}>
+              Not now
+            </button>
+          </div>
+        </div>
+      )}
       <section className="workspace" aria-label="MAGI chat workspace">
         <header className="topbar">
           <div className="brand-lockup">
@@ -969,6 +1023,16 @@ export default function Home() {
           {dragActive && (
             <div className="drag-overlay" aria-hidden="true">
               Drop files to attach — PDF, DOCX, images, or text
+            </div>
+          )}
+          {trial && !accountEmail && (
+            <div className={`trial-nudge ${trial.remaining <= 1 ? "low" : ""}`}>
+              <span>
+                {trial.remaining > 0
+                  ? `${trial.remaining} of ${trial.limit} free run${trial.remaining === 1 ? "" : "s"} left`
+                  : "Free runs used up"}
+              </span>
+              <a href="/login">Sign up free →</a>
             </div>
           )}
           <div className="mode-cards" role="radiogroup" aria-label="MAGI tier">
