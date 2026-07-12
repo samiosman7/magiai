@@ -723,61 +723,6 @@ button:disabled {
   background: var(--bg-2);
 }
 
-.mode-cards {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-}
-
-.mode-card {
-  display: grid;
-  gap: 4px;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--panel-2);
-  color: var(--text);
-  text-align: left;
-}
-
-.mode-card:hover:not(:disabled) {
-  border-color: var(--line-2);
-  filter: none;
-}
-
-.mode-card.active {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  box-shadow: 0 0 0 1px var(--accent) inset;
-}
-
-.mode-card-top {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.mode-card-top strong {
-  font-size: 0.92rem;
-}
-
-.mode-card-cost {
-  color: var(--muted);
-  font-family: var(--mono);
-  font-size: 0.72rem;
-}
-
-.mode-card.active .mode-card-cost {
-  color: var(--accent-2);
-}
-
-.mode-card-models {
-  color: var(--muted);
-  font-size: 0.74rem;
-  line-height: 1.35;
-}
-
 .composer-input {
   display: flex;
   gap: 10px;
@@ -1373,6 +1318,7 @@ button:disabled {
   transition: width 300ms ease;
 }
 .plan-reset { margin: 0; color: var(--dim); font-size: 0.78rem; }
+.plan-routing { margin: -4px 0 0; color: var(--muted); font-size: 0.78rem; }
 
 /* billing */
 .billing-box { display: grid; gap: 10px; margin-top: 12px; }
@@ -2580,10 +2526,6 @@ button:disabled {
   .composer-input button {
     width: 100%;
     padding: 13px;
-  }
-
-  .mode-cards {
-    grid-template-columns: 1fr;
   }
 
   .empty-state h2 {

@@ -106,7 +106,11 @@ export async function POST(request: Request) {
     : [];
 
   const rawPrompt = typeof body?.prompt === "string" ? body.prompt.trim() : "";
-  const mode = validModes.has(String(body?.mode)) ? (body?.mode as MagiMode) : "standard";
+  const requestedMode = validModes.has(String(body?.mode)) ? (body?.mode as MagiMode) : "standard";
+  // Routing tier is a plan feature, not a request parameter. Locked to the cheap
+  // tiers for now — premium/benchmark can't be invoked by a crafted request; when
+  // Pro launches, this is where plan.premiumRouting unlocks the frontier tier.
+  const mode: MagiMode = requestedMode === "economy" ? "economy" : "standard";
   const geminiModel = validGeminiModels.has(String(body?.geminiModel))
     ? (body?.geminiModel as GeminiModel)
     : undefined;

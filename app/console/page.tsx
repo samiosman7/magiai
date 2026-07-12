@@ -168,13 +168,9 @@ const initialSteps = Object.fromEntries(
   pipelineItems.map(({ step }) => [step, ""])
 ) as Record<PipelineStep, StepState>;
 
-type ModeKey = "economy" | "standard" | "premium";
-
-const modeInfo: Record<ModeKey, { label: string; models: string; cost: string; blurb: string }> = {
-  economy: { label: "Economy", models: "DeepSeek V3", cost: "~$0.004", blurb: "One fast model" },
-  standard: { label: "Standard", models: "DeepSeek · Qwen3 · Llama 3.3", cost: "~$0.007", blurb: "Three cheap minds" },
-  premium: { label: "Premium", models: "Gemini 3.1 Pro · GPT-5.5 · Sonnet 4.6", cost: "~$0.05", blurb: "Frontier models" },
-};
+// Routing tier is set by the subscription plan, not a per-run picker.
+// Everyone runs Standard for now; Pro/Studio will unlock frontier routing.
+const STANDARD_MODELS = "DeepSeek · Qwen3 · Llama 3.3";
 
 const heroRoles: Array<{ code: string; name: string; desc: string }> = [
   { code: "MELCHIOR·01", name: "Architect", desc: "drafts the blueprint by the book" },
@@ -231,8 +227,8 @@ function downloadMarkdown(text: string) {
 
 export default function Home() {
   const [prompt, setPrompt] = useState("");
-  const [mode, setMode] = useState<"economy" | "standard" | "premium">("standard");
-  // Pipeline routing is set by mode (cheap ensemble vs Sonnet), not a user-picked model.
+  // Locked to standard: the routing tier is a plan feature, not a per-run choice.
+  const mode = "standard" as const;
   // Kept only as a default for the separate website/artifact download generators.
   const [geminiModel] = useState("gemini-2.5-flash");
   const [messages, setMessages] = useState<Message[]>([]);
@@ -275,12 +271,6 @@ export default function Home() {
     () => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("dev") === "1",
     []
   );
-
-  const modeLabel = useMemo(() => {
-    if (mode === "economy") return "Economy MAGI";
-    if (mode === "premium") return "Premium MAGI";
-    return "Standard MAGI";
-  }, [mode]);
 
   useEffect(() => {
     const supabase = getSupabaseBrowser();
@@ -1027,7 +1017,9 @@ export default function Home() {
           <div className="brand-lockup">
             <span className="nerv-mark" aria-hidden="true">MAGI</span>
             <div>
-              <p className="kicker">Decision system · {modeLabel}</p>
+              <p className="kicker">
+                Decision system{billing ? ` · ${billing.planName} plan` : ""}
+              </p>
               <h1>Console</h1>
             </div>
           </div>
@@ -1071,7 +1063,8 @@ export default function Home() {
                 ))}
               </ol>
               <p className="hero-hint">
-                Running on <strong>{modeInfo[mode].label}</strong> · {modeInfo[mode].models}
+                Running on <strong>Standard routing</strong> · {STANDARD_MODELS}
+                {billing?.premiumRouting ? "" : " — frontier routing arrives with Pro"}
               </p>
               <div className="hero-examples">
                 {examplePrompts.map((ex) => (
@@ -1199,25 +1192,6 @@ export default function Home() {
               <a href="/login">Sign up free →</a>
             </div>
           )}
-          <div className="mode-cards" role="radiogroup" aria-label="MAGI tier">
-            {(Object.keys(modeInfo) as ModeKey[]).map((key) => (
-              <button
-                type="button"
-                key={key}
-                role="radio"
-                aria-checked={mode === key}
-                className={`mode-card ${mode === key ? "active" : ""}`}
-                onClick={() => setMode(key)}
-                disabled={isRunning}
-              >
-                <span className="mode-card-top">
-                  <strong>{modeInfo[key].label}</strong>
-                  <span className="mode-card-cost">{modeInfo[key].cost}</span>
-                </span>
-                <span className="mode-card-models">{modeInfo[key].models}</span>
-              </button>
-            ))}
-          </div>
           {(attachments.length > 0 || uploading) && (
             <div className="attach-tray" aria-label="Attached files">
               {attachments.map((file) => (
@@ -1409,6 +1383,11 @@ export default function Home() {
                 <strong>{billing.planName}</strong>
                 <span>{billing.priceUsd > 0 ? `$${billing.priceUsd}/mo` : "$0"}</span>
               </div>
+              <p className="plan-routing">
+                {billing.premiumRouting
+                  ? `Standard routing (${STANDARD_MODELS}) · frontier routing included`
+                  : `Standard routing · ${STANDARD_MODELS}`}
+              </p>
               <div className="plan-meter">
                 <div className="plan-meter-label">
                   <span>Credits</span>
